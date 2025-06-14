@@ -9,19 +9,6 @@ st.set_page_config(
     page_icon="📊"
 )
 
-# Kode untuk menyembunyikan footer bawaan Streamlit
-hide_st_ui = """
-            <style>
-            div[data-testid="stToolbar"] {visibility: hidden;}
-            div[data-testid="stDecoration"] {visibility: hidden;}
-            div[data-testid="stStatusWidget"] {visibility: hidden;}
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_st_ui, unsafe_allow_html=True)
-
 # --- FUNGSI UNTUK MEMUAT DATA (VERSI PALING ROBUST) ---
 @st.cache_data
 def load_data_from_excel(path="data.xlsx"):
