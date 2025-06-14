@@ -3,10 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # --- KONFIGURASI HALAMAN ---
+# Menambahkan theme="light" untuk memaksa mode terang
 st.set_page_config(
     layout="wide",
-    page_title="Dashboard Keuangan & Kinerja Pemda",
-    page_icon="📊"
+    page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
+    page_icon="📊",
+    theme="light" 
 )
 
 # --- FUNGSI UNTUK MEMUAT DATA DARI FILE EXCEL ---
@@ -16,15 +18,20 @@ def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
         
-        # Membaca setiap sheet yang diperlukan
-        info_df = pd.read_excel(xls, "INFO")
-        parameter_df = pd.read_excel(xls, "PARAMETER")
-        kinerja_prov_df = pd.read_excel(xls, "KINERJA_PROV")
-        kondisi_prov_df = pd.read_excel(xls, "KONDISI_PROV")
-        stat_prov_df = pd.read_excel(xls, "STAT_PROV")
-        kinerja_kab_df = pd.read_excel(xls, "KIN_KAB") # Sesuai nama file sebelumnya
-        kondisi_kab_df = pd.read_excel(xls, "KONDISI_KAB") # Sesuai nama file sebelumnya
-        stat_kab_df = pd.read_excel(xls, "STAT_KAB") # Sesuai nama file sebelumnya
+        # Membaca setiap sheet dan langsung mengubah nama kolom menjadi huruf kecil semua
+        def read_and_lowercase(sheet_name):
+            df = pd.read_excel(xls, sheet_name)
+            df.columns = df.columns.str.lower()
+            return df
+
+        info_df = read_and_lowercase("INFO")
+        parameter_df = read_and_lowercase("PARAMETER")
+        kinerja_prov_df = read_and_lowercase("KINERJA_PROV")
+        kondisi_prov_df = read_and_lowercase("KONDISI_PROV")
+        stat_prov_df = read_and_lowercase("STAT_PROV")
+        kinerja_kab_df = read_and_lowercase("KIN_KAB")
+        kondisi_kab_df = read_and_lowercase("KONDISI_KAB")
+        stat_kab_df = read_and_lowercase("STAT_KAB")
         
         # Menggabungkan data Kab & Kota untuk kemudahan
         kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df[kinerja_kab_df.columns]], ignore_index=True)
@@ -36,7 +43,6 @@ def load_data_from_excel(path="data.xlsx"):
         st.error(f"Error: File '{path}' tidak ditemukan. Pastikan file 'data.xlsx' ada di repository Anda.")
         return (None,) * 8
     except ValueError as e:
-        # Error ini akan muncul jika nama sheet salah
         st.error(f"Error saat membaca sheet dari Excel: {e}. Pastikan nama sheet sudah benar (e.g., 'INFO', 'PARAMETER', dll).")
         return (None,) * 8
 
@@ -46,7 +52,7 @@ def load_data_from_excel(path="data.xlsx"):
  kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df) = load_data_from_excel()
 
 
-# --- FUNGSI UNTUK GRAFIK (TIDAK ADA PERUBAHAN) ---
+# --- FUNGSI UNTUK GRAFIK (Kolom diubah ke huruf kecil) ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df):
     """Membuat dan menampilkan grafik Plotly dengan area statistik klaster."""
     if not selected_pemda:
@@ -54,46 +60,51 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
         return
 
     fig = go.Figure()
-    stat_filtered = stat_df[(stat_df['Klaster'] == selected_klaster) & (stat_df['Indikator'] == selected_indikator)]
+    # Menggunakan kolom huruf kecil: 'klaster', 'indikator'
+    stat_filtered = stat_df[(stat_df['klaster'] == selected_klaster) & (stat_df['indikator'] == selected_indikator)]
     
     if not stat_filtered.empty:
-        stat_filtered = stat_filtered.sort_values('Tahun')
-        fig.add_trace(go.Scatter(x=stat_filtered['Tahun'], y=stat_filtered['Min'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
-        fig.add_trace(go.Scatter(x=stat_filtered['Tahun'], y=stat_filtered['Max'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
-        fig.add_trace(go.Scatter(x=stat_filtered['Tahun'], y=stat_filtered['Median'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
+        # Menggunakan kolom huruf kecil: 'tahun', 'min', 'max', 'median'
+        stat_filtered = stat_filtered.sort_values('tahun')
+        fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['min'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
+        fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['max'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
+        fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['median'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
 
     for pemda in selected_pemda:
-        pemda_df = main_df[(main_df['Pemda'] == pemda) & (main_df['Indikator'] == selected_indikator)].sort_values('Tahun')
+        # Menggunakan kolom huruf kecil: 'pemda', 'indikator', 'tahun', 'nilai'
+        pemda_df = main_df[(main_df['pemda'] == pemda) & (main_df['indikator'] == selected_indikator)].sort_values('tahun')
         if not pemda_df.empty:
-            fig.add_trace(go.Scatter(x=pemda_df['Tahun'], y=pemda_df['Nilai'], mode='lines+markers', name=pemda, hovertemplate=f'<b>{pemda}</b><br>Tahun: %{{x}}<br>Nilai: %{{y}}<extra></extra>'))
+            fig.add_trace(go.Scatter(x=pemda_df['tahun'], y=pemda_df['nilai'], mode='lines+markers', name=pemda, hovertemplate=f'<b>{pemda}</b><br>Tahun: %{{x}}<br>Nilai: %{{y}}<extra></extra>'))
 
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
     st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Menunjukkan rentang nilai (Minimum-Maksimum) dari semua pemerintah daerah dalam klaster yang dipilih.\n- **Garis Putus-putus:** Menunjukkan nilai tengah (Median) dari klaster tersebut.""")
 
 
-# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS (TIDAK ADA PERUBAHAN) ---
+# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS (Kolom diubah ke huruf kecil) ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
     """Membuat seluruh konten untuk tab analisis, termasuk sidebar dan grafik."""
     st.sidebar.header(f"Filter {level}")
     pilihan_data = st.sidebar.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
     
+    # Menggunakan kolom huruf kecil: 'indikator kinerja'
     if pilihan_data == 'Kinerja':
         main_df = kinerja_df
-        daftar_indikator = parameter_df.iloc[0:6]['Indikator Kinerja'].dropna().unique()
+        daftar_indikator = parameter_df.iloc[0:6]['indikator kinerja'].dropna().unique()
     else:
         main_df = kondisi_df
-        daftar_indikator = parameter_df.iloc[6:13]['Indikator Kinerja'].dropna().unique()
+        daftar_indikator = parameter_df.iloc[6:13]['indikator kinerja'].dropna().unique()
     selected_indikator = st.sidebar.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
     
+    # Menggunakan kolom huruf kecil: 'tingkat', 'klaster', 'pemda'
     if level == 'Provinsi':
-        info_level_df = info_df[info_df['Tingkat'] == 'Provinsi']
+        info_level_df = info_df[info_df['tingkat'] == 'provinsi']
     else:
-        info_level_df = info_df[info_df['Tingkat'].isin(['Kabupaten', 'Kota'])]
-    daftar_klaster = sorted(info_level_df['Klaster'].dropna().unique())
+        info_level_df = info_df[info_df['tingkat'].isin(['kabupaten', 'kota'])]
+    daftar_klaster = sorted(info_level_df['klaster'].dropna().unique())
     selected_klaster = st.sidebar.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
     
-    daftar_pemda = sorted(info_level_df[info_level_df['Klaster'] == selected_klaster]['Pemda'].dropna().unique())
+    daftar_pemda = sorted(info_level_df[info_level_df['klaster'] == selected_klaster]['pemda'].dropna().unique())
     selected_pemda = st.sidebar.multiselect(f"Pilih {level}", daftar_pemda, key=f'pemda_{level.lower()}')
     
     if selected_indikator and selected_klaster:
@@ -102,6 +113,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         st.info(f"Silakan lengkapi semua filter di sidebar untuk menampilkan data {level}.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
+# Mengganti judul sesuai permintaan
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
 if info_df is None:
@@ -112,12 +124,13 @@ tab1, tab2, tab3 = st.tabs(["**Informasi**", "**Provinsi**", "**Kabupaten/Kota**
 with tab1:
     st.header("Informasi Klaster Pemerintah Daerah")
     st.markdown("Gunakan kotak pencarian untuk menemukan pemerintah daerah di dalam setiap klaster.")
-    for tingkat in ['Provinsi', 'Kabupaten', 'Kota']:
-        st.subheader(f"Klaster {tingkat}")
-        df_tingkat = info_df[info_df['Tingkat'] == tingkat][['Pemda', 'Klaster']].reset_index(drop=True)
-        search_term = st.text_input(f"Cari {tingkat}...", key=f"search_{tingkat.lower()}")
+    # Menggunakan kolom huruf kecil: 'tingkat', 'pemda', 'klaster'
+    for tingkat in ['provinsi', 'kabupaten', 'kota']:
+        st.subheader(f"Klaster {tingkat.capitalize()}")
+        df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
+        search_term = st.text_input(f"Cari {tingkat.capitalize()}...", key=f"search_{tingkat.lower()}")
         if search_term:
-            df_display = df_tingkat[df_tingkat['Pemda'].str.contains(search_term, case=False)]
+            df_display = df_tingkat[df_tingkat['pemda'].str.contains(search_term, case=False)]
         else:
             df_display = df_tingkat
         st.dataframe(df_display, use_container_width=True, hide_index=True)
