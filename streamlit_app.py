@@ -2,6 +2,13 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(
+    layout="wide",
+    page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
+    page_icon="📊"
+)
+
 # Kode untuk menyembunyikan footer bawaan Streamlit
 hide_streamlit_style = """
             <style>
@@ -11,12 +18,6 @@ hide_streamlit_style = """
             """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-# --- KONFIGURASI HALAMAN ---
-st.set_page_config(
-    layout="wide",
-    page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
-    page_icon="📊"
-)
 
 # --- FUNGSI UNTUK MEMUAT DATA (VERSI PALING ROBUST) ---
 @st.cache_data
