@@ -102,7 +102,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         st.info(f"Silakan lengkapi semua filter di sidebar untuk menampilkan data {level}.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
-st.title("📊 Dashboard Kinerja dan Kondisi Keuangan Pemerintah Daerah")
+st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
 if info_df is None:
     st.stop()
