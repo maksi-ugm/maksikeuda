@@ -2,6 +2,15 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
+# Kode untuk menyembunyikan footer bawaan Streamlit
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
     layout="wide",
