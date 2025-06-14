@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- KONFIGURASI HALAMAN (PARAMETER 'theme' DIHAPUS) ---
+# --- KONFIGURASI HALAMAN (VERSI BENAR TANPA PARAMETER 'theme') ---
 st.set_page_config(
     layout="wide",
     page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
