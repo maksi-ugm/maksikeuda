@@ -10,7 +10,6 @@ st.set_page_config(
 )
 
 # Kode untuk menyembunyikan footer bawaan Streamlit
-# Kode CSS baru yang lebih kuat
 hide_st_ui = """
             <style>
             div[data-testid="stToolbar"] {visibility: hidden;}
@@ -22,7 +21,6 @@ hide_st_ui = """
             </style>
             """
 st.markdown(hide_st_ui, unsafe_allow_html=True)
-
 
 # --- FUNGSI UNTUK MEMUAT DATA (VERSI PALING ROBUST) ---
 @st.cache_data
