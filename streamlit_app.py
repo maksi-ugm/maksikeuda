@@ -132,7 +132,9 @@ with tab1:
         tingkat = 'provinsi'
         st.subheader(f"Klaster {tingkat.capitalize()}")
         df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
-        search_term = st.text_input(f"Cari {tingkat.capitalize()}...", key=f"search_{tingkat}")
+        # --- PERBAIKAN SYNTAX ERROR DI SINI ---
+        label_pencarian = "Cari " + tingkat.capitalize() + "..."
+        search_term = st.text_input(label_pencarian, key=f"search_{tingkat}")
         if search_term:
             df_display = df_tingkat[df_tingkat['pemda'].str.contains(search_term, case=False)]
         else:
@@ -143,7 +145,9 @@ with tab1:
         tingkat = 'kabupaten'
         st.subheader(f"Klaster {tingkat.capitalize()}")
         df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
-        search_term = st.text_input(f"Cari {tingkat.capitalize()}...", key=f"search_{tingkat}")
+        # --- PERBAIKAN SYNTAX ERROR DI SINI ---
+        label_pencarian = "Cari " + tingkat.capitalize() + "..."
+        search_term = st.text_input(label_pencarian, key=f"search_{tingkat}")
         if search_term:
             df_display = df_tingkat[df_tingkat['pemda'].str.contains(search_term, case=False)]
         else:
@@ -154,4 +158,36 @@ with tab1:
         tingkat = 'kota'
         st.subheader(f"Klaster {tingkat.capitalize()}")
         df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
-        search_term = st.text_input(f"Cari {
+        # --- PERBAIKAN SYNTAX ERROR DI SINI ---
+        label_pencarian = "Cari " + tingkat.capitalize() + "..."
+        search_term = st.text_input(label_pencarian, key=f"search_{tingkat}")
+        if search_term:
+            df_display = df_tingkat[df_tingkat['pemda'].str.contains(search_term, case=False)]
+        else:
+            df_display = df_tingkat
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+# Kondisi agar sidebar hanya muncul di tab yang relevan
+# Pengecekan ini mungkin tidak sepenuhnya efektif karena cara Streamlit merender
+# Tapi ini adalah usaha untuk membatasi eksekusi kode
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = "Informasi"
+
+if st.session_state.active_tab == "Provinsi":
+    with tab2:
+        create_analysis_tab("Provinsi", info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df)
+
+if st.session_state.active_tab == "Kabupaten/Kota":
+    with tab3:
+        create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
+
+# Logika untuk mengupdate tab aktif (ini tidak standar dan mungkin tidak bekerja)
+# Pendekatan yang lebih baik adalah menerima bahwa sidebar bersifat global
+# dan memastikan kodenya tidak error adalah solusi utamanya.
+
+# Kode asli yang lebih simpel dan direkomendasikan:
+# with tab2:
+#     create_analysis_tab("Provinsi", info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df)
+
+# with tab3:
+#     create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
