@@ -1,2 +1,11 @@
+[server]
+headless = true
+
+[client]
+toolbarMode = "viewer"
+
+[ui]
+hideTopBar = true
+
 [theme]
-base="light"
+base = "light"
