@@ -10,13 +10,18 @@ st.set_page_config(
 )
 
 # Kode untuk menyembunyikan footer bawaan Streamlit
-hide_streamlit_style = """
+# Kode CSS baru yang lebih kuat
+hide_st_ui = """
             <style>
+            div[data-testid="stToolbar"] {visibility: hidden;}
+            div[data-testid="stDecoration"] {visibility: hidden;}
+            div[data-testid="stStatusWidget"] {visibility: hidden;}
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            header {visibility: hidden;}
             </style>
             """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+st.markdown(hide_st_ui, unsafe_allow_html=True)
 
 
 # --- FUNGSI UNTUK MEMUAT DATA (VERSI PALING ROBUST) ---
