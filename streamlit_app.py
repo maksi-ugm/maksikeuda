@@ -2,13 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# --- KONFIGURASI HALAMAN ---
-# Menambahkan theme="light" untuk memaksa mode terang
+# --- KONFIGURASI HALAMAN (PARAMETER 'theme' DIHAPUS) ---
 st.set_page_config(
     layout="wide",
     page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
-    page_icon="📊",
-    theme="light" 
+    page_icon="📊"
 )
 
 # --- FUNGSI UNTUK MEMUAT DATA DARI FILE EXCEL ---
@@ -18,7 +16,6 @@ def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
         
-        # Membaca setiap sheet dan langsung mengubah nama kolom menjadi huruf kecil semua
         def read_and_lowercase(sheet_name):
             df = pd.read_excel(xls, sheet_name)
             df.columns = df.columns.str.lower()
@@ -33,7 +30,6 @@ def load_data_from_excel(path="data.xlsx"):
         kondisi_kab_df = read_and_lowercase("KONDISI_KAB")
         stat_kab_df = read_and_lowercase("STAT_KAB")
         
-        # Menggabungkan data Kab & Kota untuk kemudahan
         kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df[kinerja_kab_df.columns]], ignore_index=True)
         kondisi_kabkota_df = pd.concat([kondisi_kab_df, kinerja_kab_df[kondisi_kab_df.columns]], ignore_index=True)
 
@@ -54,24 +50,20 @@ def load_data_from_excel(path="data.xlsx"):
 
 # --- FUNGSI UNTUK GRAFIK (Kolom diubah ke huruf kecil) ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df):
-    """Membuat dan menampilkan grafik Plotly dengan area statistik klaster."""
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
         return
 
     fig = go.Figure()
-    # Menggunakan kolom huruf kecil: 'klaster', 'indikator'
     stat_filtered = stat_df[(stat_df['klaster'] == selected_klaster) & (stat_df['indikator'] == selected_indikator)]
     
     if not stat_filtered.empty:
-        # Menggunakan kolom huruf kecil: 'tahun', 'min', 'max', 'median'
         stat_filtered = stat_filtered.sort_values('tahun')
         fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['min'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
         fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['max'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
         fig.add_trace(go.Scatter(x=stat_filtered['tahun'], y=stat_filtered['median'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
 
     for pemda in selected_pemda:
-        # Menggunakan kolom huruf kecil: 'pemda', 'indikator', 'tahun', 'nilai'
         pemda_df = main_df[(main_df['pemda'] == pemda) & (main_df['indikator'] == selected_indikator)].sort_values('tahun')
         if not pemda_df.empty:
             fig.add_trace(go.Scatter(x=pemda_df['tahun'], y=pemda_df['nilai'], mode='lines+markers', name=pemda, hovertemplate=f'<b>{pemda}</b><br>Tahun: %{{x}}<br>Nilai: %{{y}}<extra></extra>'))
@@ -83,11 +75,9 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
 
 # --- FUNGSI UNTUK MEMBUAT TAB ANALISIS (Kolom diubah ke huruf kecil) ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
-    """Membuat seluruh konten untuk tab analisis, termasuk sidebar dan grafik."""
     st.sidebar.header(f"Filter {level}")
     pilihan_data = st.sidebar.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
     
-    # Menggunakan kolom huruf kecil: 'indikator kinerja'
     if pilihan_data == 'Kinerja':
         main_df = kinerja_df
         daftar_indikator = parameter_df.iloc[0:6]['indikator kinerja'].dropna().unique()
@@ -96,7 +86,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         daftar_indikator = parameter_df.iloc[6:13]['indikator kinerja'].dropna().unique()
     selected_indikator = st.sidebar.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
     
-    # Menggunakan kolom huruf kecil: 'tingkat', 'klaster', 'pemda'
     if level == 'Provinsi':
         info_level_df = info_df[info_df['tingkat'] == 'provinsi']
     else:
@@ -113,7 +102,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         st.info(f"Silakan lengkapi semua filter di sidebar untuk menampilkan data {level}.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
-# Mengganti judul sesuai permintaan
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
 if info_df is None:
@@ -124,7 +112,6 @@ tab1, tab2, tab3 = st.tabs(["**Informasi**", "**Provinsi**", "**Kabupaten/Kota**
 with tab1:
     st.header("Informasi Klaster Pemerintah Daerah")
     st.markdown("Gunakan kotak pencarian untuk menemukan pemerintah daerah di dalam setiap klaster.")
-    # Menggunakan kolom huruf kecil: 'tingkat', 'pemda', 'klaster'
     for tingkat in ['provinsi', 'kabupaten', 'kota']:
         st.subheader(f"Klaster {tingkat.capitalize()}")
         df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
