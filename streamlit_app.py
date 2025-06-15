@@ -29,11 +29,15 @@ def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
 
-        # Fungsi helper untuk membaca sheet tanpa header dan memberi nama kolom generik
+        # --- FUNGSI HELPER BARU DENGAN PEMBERSIHAN DATA ---
         def read_no_header(xls_file, sheet_name):
             df = pd.read_excel(xls_file, sheet_name, header=None)
             df = df.iloc[1:] # Lewati baris pertama (header asli)
             df.columns = [f'col_{i}' for i in range(len(df.columns))]
+            # Membersihkan spasi tersembunyi dari semua kolom teks
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].str.strip()
             return df
 
         # 1. Proses Sheet INFO
@@ -47,8 +51,12 @@ def load_data_from_excel(path="data.xlsx"):
 
         # 2. Proses Sheet PARAMETER
         parameter_df = pd.read_excel(xls, "PARAMETER", header=None)
+        # Membersihkan spasi di parameter_df juga
+        for col in parameter_df.columns:
+            if parameter_df[col].dtype == 'object':
+                parameter_df[col] = parameter_df[col].str.strip()
 
-        # 3. Baca sheet data utama
+        # 3. Baca sheet data utama menggunakan fungsi helper baru
         kinerja_prov_df = read_no_header(xls, "KINERJA_PROV")
         kondisi_prov_df = read_no_header(xls, "KONDISI_PROV")
         stat_prov_df = read_no_header(xls, "STAT_PROV")
@@ -62,7 +70,7 @@ def load_data_from_excel(path="data.xlsx"):
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI GRAFIK (DENGAN PERBAIKAN FILTER STATISTIK) ---
+# --- FUNGSI GRAFIK ---
 def display_chart(selected_pemda, selected_indikator_full, selected_klaster, main_df, stat_df, chart_type, color_palette):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
@@ -71,20 +79,20 @@ def display_chart(selected_pemda, selected_indikator_full, selected_klaster, mai
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    # --- PERBAIKAN: Buat nama indikator dasar untuk filtering data ---
-    base_indikator = selected_indikator_full.split(' - ')[0]
+    base_indikator = selected_indikator_full.split(' - ')[0].strip()
 
-    # Proses data statistik (kolom 0=TIME, 1=INDICATOR, 2=STATISTIK, 3=KLASTER, 4=NILAI)
-    # Filter menggunakan base_indikator
+    # Proses data statistik
     stat_filtered = stat_df[(stat_df['col_3'] == selected_klaster) & (stat_df['col_1'] == base_indikator)]
+    
+    contains_text_data = False
+    
     if not stat_filtered.empty:
         try:
             stat_pivot = stat_filtered.pivot(index='col_0', columns='col_2', values='col_4').reset_index()
-            stat_pivot.columns = [str(col).upper() for col in stat_pivot.columns]
+            stat_pivot.columns = [str(col).upper().strip() for col in stat_pivot.columns]
             stat_pivot.rename(columns={'COL_0': 'TIME'}, inplace=True)
             stat_pivot = stat_pivot.sort_values('TIME')
             
-            # Cek jika kolom MIN, MAX, MEDIAN ada setelah pivot
             if all(col in stat_pivot.columns for col in ['MIN', 'MAX', 'MEDIAN']):
                 fig.add_trace(go.Scatter(x=stat_pivot['TIME'], y=stat_pivot['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
                 fig.add_trace(go.Scatter(x=stat_pivot['TIME'], y=stat_pivot['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
@@ -92,10 +100,8 @@ def display_chart(selected_pemda, selected_indikator_full, selected_klaster, mai
         except Exception:
              pass 
 
-    # Proses data utama
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
-        # Filter menggunakan base_indikator
         pemda_df = main_df[(main_df['col_2'] == pemda) & (main_df['col_1'] == base_indikator)].copy()
         if pemda_df.empty: continue
         
@@ -104,6 +110,7 @@ def display_chart(selected_pemda, selected_indikator_full, selected_klaster, mai
         text_data = pemda_df[pemda_df['NILAI_NUMERIC'].isna()]
         
         if not text_data.empty:
+            contains_text_data = True
             for _, row in text_data.iterrows():
                 annotations_to_add.append(dict(x=row['col_0'], y=0, yref="y", text=f"{pemda}:<br>{row['col_3']}", showarrow=True, arrowhead=1, ax=0, ay=-40))
         
@@ -114,15 +121,20 @@ def display_chart(selected_pemda, selected_indikator_full, selected_klaster, mai
             elif chart_type == 'Area': fig.add_trace(go.Scatter(x=df_plot['col_0'], y=df_plot['NILAI_NUMERIC'], mode='lines', name=pemda, line=dict(color=color), fill='tozeroy'))
             elif chart_type == 'Batang': fig.add_trace(go.Bar(x=df_plot['col_0'], y=df_plot['NILAI_NUMERIC'], name=pemda, marker_color=color))
 
+    if contains_text_data:
+        # Jika ada data teks, hapus jejak statistik klaster agar tidak membingungkan
+        fig.data = [trace for trace in fig.data if trace.name not in ['Rentang Klaster (Min-Max)', 'Median Klaster']]
+
     for ann in annotations_to_add: fig.add_annotation(ann)
 
     fig.update_layout(title=f'<b>{selected_indikator_full}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
-    st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
+    
+    if not contains_text_data:
+        st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
 
 # --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
-    
     filter_col, chart_col = st.columns([1, 3])
 
     with filter_col:
@@ -134,11 +146,9 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         indikator_col_idx, deskripsi_col_idx = 0, 1
         
         if pilihan_data == 'Kondisi':
-            main_df = kondisi_df
-            daftar_indikator = parameter_df.iloc[1:7, 0].dropna().unique()
+            main_df, daftar_indikator = kondisi_df, parameter_df.iloc[1:7, 0].dropna().unique()
         else: # Kinerja
-            main_df = kinerja_df
-            daftar_indikator = parameter_df.iloc[7:14, 0].dropna().unique()
+            main_df, daftar_indikator = kinerja_df, parameter_df.iloc[7:14, 0].dropna().unique()
 
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
         
@@ -179,9 +189,9 @@ if data_tuple is None or data_tuple[0] is None:
 
 info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df = data_tuple
 
-# --- BAGIAN DEBUGGING ---
+# Menu Debugging (opsional)
 # with st.expander("Lihat Data Mentah untuk Debugging"):
-#     st.write("Data `PARAMETER` (tanpa header):")
+#     st.write("Data `PARAMETER` (tanpa header, sudah dibersihkan):")
 #     st.dataframe(parameter_df)
 
 tab1, tab2 = st.tabs(["**Informasi**", "**Provinsi**"])
