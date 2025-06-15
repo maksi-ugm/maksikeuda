@@ -23,11 +23,19 @@ hide_st_ui = r"""
             """
 st.markdown(hide_st_ui, unsafe_allow_html=True) 
 
-# --- FUNGSI MEMUAT DATA (PENDEKATAN BARU & AMAN) ---
+# --- FUNGSI MEMUAT DATA (PENDEKATAN POSISIONAL) ---
 @st.cache_data
 def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
+
+        # Fungsi helper untuk membaca sheet tanpa header dan memberi nama kolom generik
+        def read_no_header(xls_file, sheet_name):
+            df = pd.read_excel(xls_file, sheet_name, header=None)
+            # Lewati baris pertama (header asli)
+            df = df.iloc[1:]
+            df.columns = [f'col_{i}' for i in range(len(df.columns))]
+            return df
 
         # 1. Proses Sheet INFO
         df_info_raw = pd.read_excel(xls, "INFO", header=None)
@@ -36,35 +44,26 @@ def load_data_from_excel(path="data.xlsx"):
         df_kota = df_info_raw[['col_3', 'col_4']].copy(); df_kota.rename(columns={'col_3': 'klaster', 'col_4': 'pemda'}, inplace=True); df_kota['tingkat'] = 'kota'
         df_kab = df_info_raw[['col_6', 'col_7']].copy(); df_kab.rename(columns={'col_6': 'klaster', 'col_7': 'pemda'}, inplace=True); df_kab['tingkat'] = 'kabupaten'
         info_df = pd.concat([df_prov, df_kota, df_kab], ignore_index=True).dropna(subset=['pemda'])
-        info_df = info_df[info_df['pemda'] != 'PROVINSI']
+        info_df = info_df[info_df['pemda'] != 'PROVINSI'] 
 
-        # 2. Proses Sheet PARAMETER tanpa membaca header sama sekali
+        # 2. Proses Sheet PARAMETER tanpa header
         parameter_df = pd.read_excel(xls, "PARAMETER", header=None)
 
-        # 3. Baca sheet data utama
-        kinerja_prov_df = pd.read_excel(xls, "KINERJA_PROV")
-        kondisi_prov_df = pd.read_excel(xls, "KONDISI_PROV")
-        stat_prov_df = pd.read_excel(xls, "STAT_PROV")
+        # 3. Baca sheet data utama tanpa header
+        kinerja_prov_df = read_no_header(xls, "KINERJA_PROV")
+        kondisi_prov_df = read_no_header(xls, "KONDISI_PROV")
+        stat_prov_df = read_no_header(xls, "STAT_PROV")
         
-        # Menyamakan nama kolom di stat_prov_df untuk konsistensi
-        stat_prov_df.rename(columns={'INDIKATOR KINERJA': 'INDICATOR', 'INDIKATOR KONDISI': 'INDICATOR'}, inplace=True, errors='ignore')
-        
-        # Data kab/kota tidak kita proses dulu
-        kinerja_kabkota_df = pd.DataFrame()
-        kondisi_kabkota_df = pd.DataFrame()
-        stat_kab_df = pd.DataFrame()
-
-        return (info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, 
-                kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
+        return (info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df)
 
     except Exception as e:
         st.error(f"Terjadi error fatal saat memuat data: {e}.")
-        return (None,) * 8
+        return (None,) * 5
 
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI GRAFIK (DENGAN LOGIKA BARU) ---
+# --- FUNGSI GRAFIK (MENGGUNAKAN POSISI KOLOM) ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
@@ -73,52 +72,45 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    # Flag untuk mengecek apakah ada data teks
-    contains_text_data = False
+    # Proses data statistik (kolom 0=TIME, 1=INDICATOR, 2=STATISTIK, 3=KLASTER, 4=NILAI)
+    stat_filtered = stat_df[(stat_df['col_3'] == selected_klaster) & (stat_df['col_1'] == selected_indikator)]
+    if not stat_filtered.empty:
+        try:
+            stat_pivot = stat_filtered.pivot(index='col_0', columns='col_2', values='col_4').reset_index()
+            stat_pivot.columns = stat_pivot.columns.str.upper()
+            stat_pivot = stat_pivot.sort_values('COL_0')
+            fig.add_trace(go.Scatter(x=stat_pivot['COL_0'], y=stat_pivot['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
+            fig.add_trace(go.Scatter(x=stat_pivot['COL_0'], y=stat_pivot['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
+            fig.add_trace(go.Scatter(x=stat_pivot['COL_0'], y=stat_pivot['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
+        except Exception:
+             pass 
 
-    # Proses data utama pemda terlebih dahulu
+    # Proses data utama (kolom 0=TIME, 1=INDICATOR, 2=PEMDA, 3=NILAI)
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
-        pemda_df = main_df[(main_df['PEMDA'] == pemda) & (main_df['INDICATOR'] == selected_indikator)].copy()
+        pemda_df = main_df[(main_df['col_2'] == pemda) & (main_df['col_1'] == selected_indikator)].copy()
         if pemda_df.empty: continue
         
-        pemda_df['NILAI_NUMERIC'] = pd.to_numeric(pemda_df['NILAI'], errors='coerce')
+        pemda_df['NILAI_NUMERIC'] = pd.to_numeric(pemda_df['col_3'], errors='coerce')
         numeric_data = pemda_df.dropna(subset=['NILAI_NUMERIC'])
         text_data = pemda_df[pemda_df['NILAI_NUMERIC'].isna()]
-
+        
         if not text_data.empty:
-            contains_text_data = True
             for _, row in text_data.iterrows():
-                annotations_to_add.append(dict(x=row['TIME'], y=0, yref="y", text=f"{pemda}:<br>{row['NILAI']}", showarrow=True, arrowhead=1, ax=0, ay=-40))
+                annotations_to_add.append(dict(x=row['col_0'], y=0, yref="y", text=f"{pemda}:<br>{row['col_3']}", showarrow=True, arrowhead=1, ax=0, ay=-40))
         
         if not numeric_data.empty:
             color = colors[i % len(colors)]
-            df_plot = numeric_data.sort_values('TIME')
-            if chart_type == 'Garis': fig.add_trace(go.Scatter(x=df_plot['TIME'], y=df_plot['NILAI_NUMERIC'], mode='lines+markers', name=pemda, line=dict(color=color), marker=dict(color=color)))
-            elif chart_type == 'Area': fig.add_trace(go.Scatter(x=df_plot['TIME'], y=df_plot['NILAI_NUMERIC'], mode='lines', name=pemda, line=dict(color=color), fill='tozeroy'))
-            elif chart_type == 'Batang': fig.add_trace(go.Bar(x=df_plot['TIME'], y=df_plot['NILAI_NUMERIC'], name=pemda, marker_color=color))
-
-    # --- LOGIKA BARU: Hanya tampilkan statistik jika tidak ada data teks ---
-    if not contains_text_data:
-        stat_filtered = stat_df[(stat_df['KLASTER'] == selected_klaster) & (stat_df['INDICATOR'] == selected_indikator)]
-        if not stat_filtered.empty:
-            try:
-                stat_pivot = stat_filtered.pivot(index='TIME', columns='STATISTIK', values='NILAI').reset_index()
-                stat_pivot.columns = stat_pivot.columns.str.upper()
-                stat_pivot = stat_pivot.sort_values('TIME')
-                fig.add_trace(go.Scatter(x=stat_pivot['TIME'], y=stat_pivot['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
-                fig.add_trace(go.Scatter(x=stat_pivot['TIME'], y=stat_pivot['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
-                fig.add_trace(go.Scatter(x=stat_pivot['TIME'], y=stat_pivot['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
-            except Exception:
-                 pass 
+            df_plot = numeric_data.sort_values('col_0')
+            if chart_type == 'Garis': fig.add_trace(go.Scatter(x=df_plot['col_0'], y=df_plot['NILAI_NUMERIC'], mode='lines+markers', name=pemda, line=dict(color=color), marker=dict(color=color)))
+            elif chart_type == 'Area': fig.add_trace(go.Scatter(x=df_plot['col_0'], y=df_plot['NILAI_NUMERIC'], mode='lines', name=pemda, line=dict(color=color), fill='tozeroy'))
+            elif chart_type == 'Batang': fig.add_trace(go.Bar(x=df_plot['col_0'], y=df_plot['NILAI_NUMERIC'], name=pemda, marker_color=color))
 
     for ann in annotations_to_add: fig.add_annotation(ann)
 
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
-    
-    if not contains_text_data:
-        st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
+    st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
 
 # --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
@@ -132,16 +124,16 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
         
         # Logika baru berdasarkan posisi kolom dan baris
-        kinerja_col_idx, kondisi_col_idx, deskripsi_col_idx = 0, 2, 1
-
+        indikator_col_idx = 0; deskripsi_col_idx = 1
+        
         if pilihan_data == 'Kondisi':
             main_df = kondisi_df
             # Baris 2-7 di Excel adalah index 1 sampai 6 di pandas
-            daftar_indikator = parameter_df.iloc[1:7, kondisi_col_idx].dropna().unique()
+            daftar_indikator = parameter_df.iloc[1:7, indikator_col_idx].dropna().unique()
         else: # Kinerja
             main_df = kinerja_df
-            # Baris 2-7 di Excel adalah index 1 sampai 6 di pandas (sesuai screenshot)
-            daftar_indikator = parameter_df.iloc[1:7, kinerja_col_idx].dropna().unique()
+            # Baris 8-14 di Excel adalah index 7 sampai 13 di pandas
+            daftar_indikator = parameter_df.iloc[7:14, indikator_col_idx].dropna().unique()
 
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
         
@@ -160,19 +152,16 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
-            # Cari deskripsi berdasarkan indikator yang dipilih
-            # Cek di kedua kolom indikator (kinerja dan kondisi)
-            desc_text = "Deskripsi untuk indikator ini tidak tersedia."
-            for col_idx in [kinerja_col_idx, kondisi_col_idx]:
-                mask = parameter_df.iloc[:, col_idx] == selected_indikator
-                if mask.any():
-                    deskripsi_row = parameter_df.loc[mask]
-                    if not deskripsi_row.empty:
-                        deskripsi = deskripsi_row.iloc[0, deskripsi_col_idx]
-                        if pd.notna(deskripsi) and deskripsi:
-                            desc_text = deskripsi
-                        break
-            st.info(desc_text)
+            mask = parameter_df.iloc[:, indikator_col_idx] == selected_indikator
+            deskripsi_row = parameter_df.loc[mask]
+            if not deskripsi_row.empty:
+                deskripsi = deskripsi_row.iloc[0, deskripsi_col_idx]
+                if pd.notna(deskripsi) and deskripsi:
+                    st.info(deskripsi)
+                else:
+                    st.info("Deskripsi untuk indikator ini tidak tersedia.")
+            else:
+                st.info("Deskripsi untuk indikator ini tidak tersedia.")
         else:
             st.info(f"Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
 
@@ -182,7 +171,16 @@ st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 if data_tuple is None or data_tuple[0] is None:
     st.stop()
 
-info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, _, _, _ = data_tuple
+info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df = data_tuple
+
+# Menu Debugging (opsional)
+if st.checkbox("Tampilkan Data Mentah untuk Debugging"):
+    st.write("Data `PARAMETER` (tanpa header):")
+    st.dataframe(parameter_df)
+    st.write("Data `KINERJA_PROV` (tanpa header):")
+    st.dataframe(kinerja_prov_df.head())
+    st.write("Data `STAT_PROV` (tanpa header):")
+    st.dataframe(stat_prov_df.head())
 
 tab1, tab2 = st.tabs(["**Informasi**", "**Provinsi**"])
 
