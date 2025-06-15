@@ -37,21 +37,20 @@ def load_data_from_excel(path="data.xlsx"):
         df_info_raw = pd.read_excel(xls, "INFO")
         df_info_raw.columns = df_info_raw.columns.str.strip().str.lower()
         
-        df_prov = df_info_raw[['klaster', 'provinsi']].copy()
-        df_prov.rename(columns={'provinsi': 'pemda'}, inplace=True)
-        df_prov['tingkat'] = 'provinsi'
-
-        df_kota = df_info_raw[['klaster.1', 'kota']].copy()
-        df_kota.rename(columns={'klaster.1': 'klaster', 'kota': 'pemda'}, inplace=True)
-        df_kota['tingkat'] = 'kota'
-
-        df_kab = df_info_raw[['klaster.2', 'kabupaten']].copy()
-        df_kab.rename(columns={'klaster.2': 'klaster', 'kabupaten': 'pemda'}, inplace=True)
-        df_kab['tingkat'] = 'kabupaten'
+        df_prov = df_info_raw[['klaster', 'provinsi']].copy(); df_prov.rename(columns={'provinsi': 'pemda'}, inplace=True); df_prov['tingkat'] = 'provinsi'
+        df_kota = df_info_raw[['klaster.1', 'kota']].copy(); df_kota.rename(columns={'klaster.1': 'klaster', 'kota': 'pemda'}, inplace=True); df_kota['tingkat'] = 'kota'
+        df_kab = df_info_raw[['klaster.2', 'kabupaten']].copy(); df_kab.rename(columns={'klaster.2': 'klaster', 'kabupaten': 'pemda'}, inplace=True); df_kab['tingkat'] = 'kabupaten'
         
         info_df = pd.concat([df_prov, df_kota, df_kab], ignore_index=True).dropna(subset=['pemda'])
 
-        parameter_df = read_and_clean_sheet(xls, "PARAMETER")
+        df_param_raw = pd.read_excel(xls, "PARAMETER")
+        parameter_df = pd.DataFrame({
+            'indeks kinerja': df_param_raw.iloc[:, 0],
+            'unnamed: 1': df_param_raw.iloc[:, 1],
+            'indeks kondisi': df_param_raw.iloc[:, 2],
+            'unnamed: 3': df_param_raw.iloc[:, 3]
+        })
+
         kinerja_prov_df = read_and_clean_sheet(xls, "KINERJA_PROV")
         kondisi_prov_df = read_and_clean_sheet(xls, "KONDISI_PROV")
         stat_prov_df = read_and_clean_sheet(xls, "STAT_PROV")
@@ -100,54 +99,60 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     st.plotly_chart(fig, use_container_width=True)
     st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
 
-# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
+# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS (DENGAN KOLOM FILTER) ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
-    st.sidebar.header(f"Filter {level}")
-    color_palette = st.sidebar.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
-    chart_type = st.sidebar.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}')
-    pilihan_data = st.sidebar.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
     
-    if pilihan_data == 'Kondisi':
-        main_df = kondisi_df
-        daftar_indikator = parameter_df['indeks kondisi'].dropna().unique()
-        kolom_indikator = 'indeks kondisi'
-        kolom_deskripsi = 'unnamed: 3'
-    else: 
-        main_df = kinerja_df
-        daftar_indikator = parameter_df['indeks kinerja'].dropna().unique()
-        kolom_indikator = 'indeks kinerja'
-        kolom_deskripsi = 'unnamed: 1'
+    # Membuat kolom untuk filter dan untuk grafik
+    filter_col, chart_col = st.columns([1, 3]) # Rasio 1/4 untuk filter, 3/4 untuk chart
 
-    selected_indikator = st.sidebar.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
-    
-    if level == 'Provinsi':
-        info_level_df = info_df[info_df['tingkat'] == 'provinsi']
-    else:
-        info_level_df = info_df[info_df['tingkat'].isin(['kabupaten', 'kota'])]
-    
-    daftar_klaster = sorted(info_level_df['klaster'].dropna().unique())
-    selected_klaster = st.sidebar.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
-    
-    daftar_pemda = sorted(info_level_df[info_level_df['klaster'] == selected_klaster]['pemda'].dropna().unique())
-    selected_pemda = st.sidebar.multiselect(f"Pilih {level}", daftar_pemda, key=f'pemda_{level.lower()}')
-    
-    if selected_indikator and selected_klaster:
-        display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette)
+    with filter_col:
+        st.header(f"Filter {level}")
+        color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
+        chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}')
+        pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
         
-        st.markdown("---")
-        st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
+        if pilihan_data == 'Kondisi':
+            daftar_indikator = parameter_df['indeks kondisi'].dropna().unique()
+        else: 
+            daftar_indikator = parameter_df['indeks kinerja'].dropna().unique()
 
-        deskripsi = ""
-        row = parameter_df.loc[parameter_df[kolom_indikator] == selected_indikator]
-        if not row.empty:
-            deskripsi = row[kolom_deskripsi].iloc[0]
+        selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
+        
+        if level == 'Provinsi': info_level_df = info_df[info_df['tingkat'] == 'provinsi']
+        else: info_level_df = info_df[info_df['tingkat'].isin(['kabupaten', 'kota'])]
+        
+        daftar_klaster = sorted(info_level_df['klaster'].dropna().unique())
+        selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
+        
+        daftar_pemda = sorted(info_level_df[info_level_df['klaster'] == selected_klaster]['pemda'].dropna().unique())
+        selected_pemda = st.multiselect(f"Pilih {level}", daftar_pemda, key=f'pemda_{level.lower()}')
 
-        if pd.notna(deskripsi) and deskripsi:
-             st.info(deskripsi)
+    with chart_col:
+        if pilihan_data == 'Kondisi': main_df = kondisi_df
+        else: main_df = kinerja_df
+
+        if selected_indikator and selected_klaster:
+            display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette)
+            
+            st.markdown("---")
+            st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
+
+            deskripsi = ""
+            if pilihan_data == 'Kondisi':
+                kolom_indikator, kolom_deskripsi = 'indeks kondisi', 'unnamed: 3'
+            else:
+                kolom_indikator, kolom_deskripsi = 'indeks kinerja', 'unnamed: 1'
+            
+            row = parameter_df.loc[parameter_df[kolom_indikator] == selected_indikator]
+            if not row.empty:
+                deskripsi = row[kolom_deskripsi].iloc[0]
+
+            if pd.notna(deskripsi) and deskripsi:
+                 st.info(deskripsi)
+            else:
+                 st.info("Deskripsi untuk indikator ini tidak tersedia.")
         else:
-             st.info("Deskripsi untuk indikator ini tidak tersedia.")
-    else:
-        st.info(f"Silakan lengkapi semua filter di sidebar untuk menampilkan data {level}.")
+            st.info(f"Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
