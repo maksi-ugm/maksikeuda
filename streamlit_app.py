@@ -34,7 +34,6 @@ def load_data_from_excel(path="data.xlsx"):
             df.columns = df.columns.str.strip().str.lower()
             return df
 
-        # 1. Proses Sheet INFO
         df_info_raw = pd.read_excel(xls, "INFO")
         df_info_raw.columns = df_info_raw.columns.str.strip().str.lower()
         
@@ -52,7 +51,6 @@ def load_data_from_excel(path="data.xlsx"):
         
         info_df = pd.concat([df_prov, df_kota, df_kab], ignore_index=True).dropna(subset=['pemda'])
 
-        # 2. Baca sheet lainnya
         parameter_df = read_and_clean_sheet(xls, "PARAMETER")
         kinerja_prov_df = read_and_clean_sheet(xls, "KINERJA_PROV")
         kondisi_prov_df = read_and_clean_sheet(xls, "KONDISI_PROV")
@@ -109,14 +107,12 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
     chart_type = st.sidebar.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}')
     pilihan_data = st.sidebar.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
     
-    # PERHATIKAN: Urutan if/else ini diubah sesuai instruksi Anda
-    # Kondisi: row 2-7, Kinerja: row 8-14
     if pilihan_data == 'Kondisi':
         main_df = kondisi_df
         daftar_indikator = parameter_df['indeks kondisi'].dropna().unique()
         kolom_indikator = 'indeks kondisi'
         kolom_deskripsi = 'unnamed: 3'
-    else: # Kinerja
+    else: 
         main_df = kinerja_df
         daftar_indikator = parameter_df['indeks kinerja'].dropna().unique()
         kolom_indikator = 'indeks kinerja'
@@ -124,4 +120,65 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 
     selected_indikator = st.sidebar.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
     
-    if level == '
+    if level == 'Provinsi':
+        info_level_df = info_df[info_df['tingkat'] == 'provinsi']
+    else:
+        info_level_df = info_df[info_df['tingkat'].isin(['kabupaten', 'kota'])]
+    
+    daftar_klaster = sorted(info_level_df['klaster'].dropna().unique())
+    selected_klaster = st.sidebar.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
+    
+    daftar_pemda = sorted(info_level_df[info_level_df['klaster'] == selected_klaster]['pemda'].dropna().unique())
+    selected_pemda = st.sidebar.multiselect(f"Pilih {level}", daftar_pemda, key=f'pemda_{level.lower()}')
+    
+    if selected_indikator and selected_klaster:
+        display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette)
+        
+        st.markdown("---")
+        st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
+
+        deskripsi = ""
+        row = parameter_df.loc[parameter_df[kolom_indikator] == selected_indikator]
+        if not row.empty:
+            deskripsi = row[kolom_deskripsi].iloc[0]
+
+        if pd.notna(deskripsi) and deskripsi:
+             st.info(deskripsi)
+        else:
+             st.info("Deskripsi untuk indikator ini tidak tersedia.")
+    else:
+        st.info(f"Silakan lengkapi semua filter di sidebar untuk menampilkan data {level}.")
+
+# --- STRUKTUR UTAMA APLIKASI ---
+st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
+
+if data_tuple[0] is None:
+    st.stop()
+
+info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
+
+tab1, tab2, tab3 = st.tabs(["**Informasi**", "**Provinsi**", "**Kabupaten/Kota**"])
+
+with tab1:
+    st.header("Informasi Klaster Pemerintah Daerah")
+    st.markdown("Gunakan kotak pencarian untuk menemukan pemerintah daerah di dalam setiap klaster.")
+    col1, col2, col3 = st.columns(3, gap="large")
+    for i, tingkat in enumerate(['provinsi', 'kabupaten', 'kota']):
+        with [col1, col2, col3][i]:
+            st.subheader(f"Klaster {tingkat.capitalize()}")
+            df_tingkat = info_df[info_df['tingkat'] == tingkat][['pemda', 'klaster']].reset_index(drop=True)
+            label_pencarian = f"Cari {tingkat.capitalize()}..."
+            search_term = st.text_input(label_pencarian, key=f"search_{tingkat}")
+            if search_term: df_display = df_tingkat[df_tingkat['pemda'].str.contains(search_term, case=False)]
+            else: df_display = df_tingkat
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+with tab2:
+    create_analysis_tab("Provinsi", info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df)
+
+with tab3:
+    create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
+
+# --- FOOTER CUSTOM ---
+st.markdown("---")
+st.markdown("Dibuat oleh **Kelas MAKSI UGM**")
