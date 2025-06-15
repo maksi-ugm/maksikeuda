@@ -23,52 +23,39 @@ hide_st_ui = r"""
             """
 st.markdown(hide_st_ui, unsafe_allow_html=True) 
 
-# --- FUNGSI MEMUAT DATA (VERSI FINAL SESUAI DATA ASLI) ---
+# --- FUNGSI MEMUAT DATA ---
 @st.cache_data
 def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
 
-        # 1. Proses Sheet INFO (tetap diubah ke lowercase untuk konsistensi internal)
-        df_info_raw = pd.read_excel(xls, "INFO")
-        df_info_raw.columns = df_info_raw.columns.str.strip().str.lower()
-        df_prov = df_info_raw[['klaster', 'provinsi']].copy(); df_prov.rename(columns={'provinsi': 'pemda'}, inplace=True); df_prov['tingkat'] = 'provinsi'
-        df_kota = df_info_raw[['klaster.1', 'kota']].copy(); df_kota.rename(columns={'klaster.1': 'klaster', 'kota': 'pemda'}, inplace=True); df_kota['tingkat'] = 'kota'
-        df_kab = df_info_raw[['klaster.2', 'kabupaten']].copy(); df_kab.rename(columns={'klaster.2': 'klaster', 'kabupaten': 'pemda'}, inplace=True); df_kab['tingkat'] = 'kabupaten'
+        # 1. Proses Sheet INFO
+        df_info_raw = pd.read_excel(xls, "INFO", header=None)
+        df_info_raw.columns = [f'col_{i}' for i in range(len(df_info_raw.columns))]
+        df_prov = df_info_raw[['col_0', 'col_1']].copy(); df_prov.rename(columns={'col_0': 'klaster', 'col_1': 'pemda'}, inplace=True); df_prov['tingkat'] = 'provinsi'
+        df_kota = df_info_raw[['col_3', 'col_4']].copy(); df_kota.rename(columns={'col_3': 'klaster', 'col_4': 'pemda'}, inplace=True); df_kota['tingkat'] = 'kota'
+        df_kab = df_info_raw[['col_6', 'col_7']].copy(); df_kab.rename(columns={'col_6': 'klaster', 'col_7': 'pemda'}, inplace=True); df_kab['tingkat'] = 'kabupaten'
         info_df = pd.concat([df_prov, df_kota, df_kab], ignore_index=True).dropna(subset=['pemda'])
+        info_df = info_df[info_df['pemda'] != 'PROVINSI'] # Menghapus baris header
 
-        # 2. Proses Sheet PARAMETER
-        df_param_raw = pd.read_excel(xls, "PARAMETER")
-        # Ambil kolom berdasarkan nama aslinya
-        kinerja_desc = df_param_raw[['INDEKS KINERJA', 'Unnamed: 1']].copy().dropna(subset=['INDEKS KINERJA'])
-        kinerja_desc.rename(columns={'INDEKS KINERJA': 'INDIKATOR', 'Unnamed: 1': 'DESKRIPSI'}, inplace=True)
-        kondisi_desc = df_param_raw[['INDEKS KONDISI', 'Unnamed: 1']].copy().dropna(subset=['INDEKS KONDISI'])
-        kondisi_desc.rename(columns={'INDEKS KONDISI': 'INDIKATOR', 'Unnamed: 1': 'DESKRIPSI'}, inplace=True)
-        parameter_df = pd.concat([kinerja_desc, kondisi_desc], ignore_index=True)
+        # 2. Proses Sheet PARAMETER (sekarang tanpa mengubahnya sama sekali)
+        parameter_df = pd.read_excel(xls, "PARAMETER")
 
-        # 3. Baca sheet lain tanpa mengubah nama kolom (tetap KAPITAL)
+        # 3. Baca sheet lain
         kinerja_prov_df = pd.read_excel(xls, "KINERJA_PROV")
         kondisi_prov_df = pd.read_excel(xls, "KONDISI_PROV")
         stat_prov_df = pd.read_excel(xls, "STAT_PROV")
         
-        # Data kab/kota tidak kita pakai dulu, tapi tetap dimuat
-        kinerja_kab_df = pd.read_excel(xls, "KIN_KAB")
-        kondisi_kab_df = pd.read_excel(xls, "KONDISI_KAB")
-        stat_kab_df = pd.read_excel(xls, "STAT_KAB")
-        kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df.reindex(columns=kinerja_kab_df.columns)], ignore_index=True)
-        kondisi_kabkota_df = pd.concat([kondisi_kab_df, kinerja_kab_df.reindex(columns=kondisi_kab_df.columns)], ignore_index=True)
-
-        return (info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, 
-                kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
+        return (info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df)
 
     except Exception as e:
         st.error(f"Terjadi error fatal saat memuat data: {e}. Periksa file 'data.xlsx' dan nama-nama sheet-nya.")
-        return (None,) * 8
+        return (None,) * 5
 
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI UNTUK GRAFIK (MENGGUNAKAN KOLOM KAPITAL) ---
+# --- FUNGSI UNTUK GRAFIK ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
@@ -98,6 +85,7 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
 
 # --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
+    
     filter_col, chart_col = st.columns([1, 3])
 
     with filter_col:
@@ -106,18 +94,24 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}')
         pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
         
-        kinerja_list = parameter_df[parameter_df['INDIKATOR'].str.contains('Kinerja', case=False, na=False)]['INDIKATOR'].unique()
-        kondisi_list = parameter_df[parameter_df['INDIKATOR'].str.contains('Kondisi', case=False, na=False)]['INDIKATOR'].unique()
-
+        # --- PERUBAHAN LOGIKA SESUAI INSTRUKSI BARIS ---
+        # Asumsi indikator ada di kolom pertama (index 0) dan deskripsi di kolom kedua (index 1)
+        # di sheet PARAMETER
+        indikator_col_idx = 0
+        deskripsi_col_idx = 1
+        
         if pilihan_data == 'Kondisi':
-            main_df, daftar_indikator = kondisi_df, kondisi_list
-        else: 
-            main_df, daftar_indikator = kinerja_df, kinerja_list
+            main_df = kondisi_df
+            # Baris 2-7 di Excel adalah index 1 sampai 6 di pandas
+            daftar_indikator = parameter_df.iloc[1:7, indikator_col_idx].dropna().unique()
+        else: # Kinerja
+            main_df = kinerja_df
+            # Baris 8-14 di Excel adalah index 7 sampai 13 di pandas
+            daftar_indikator = parameter_df.iloc[7:14, indikator_col_idx].dropna().unique()
 
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
         
-        if level == 'Provinsi': info_level_df = info_df[info_df['tingkat'] == 'provinsi']
-        else: info_level_df = info_df[info_df['tingkat'].isin(['kabupaten', 'kota'])]
+        info_level_df = info_df[info_df['tingkat'] == 'provinsi']
         
         daftar_klaster = sorted(info_level_df['klaster'].dropna().unique())
         selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
@@ -132,9 +126,14 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
-            deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
+            # Cari deskripsi berdasarkan indikator yang dipilih
+            # Mencari baris yang cocok di kolom indikator
+            mask = parameter_df.iloc[:, indikator_col_idx] == selected_indikator
+            deskripsi_row = parameter_df.loc[mask]
+
             if not deskripsi_row.empty:
-                deskripsi = deskripsi_row['DESKRIPSI'].iloc[0]
+                # Ambil deskripsi dari kolom di sebelahnya
+                deskripsi = deskripsi_row.iloc[0, deskripsi_col_idx]
                 if pd.notna(deskripsi) and deskripsi:
                     st.info(deskripsi)
                 else:
@@ -147,10 +146,11 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 # --- STRUKTUR UTAMA APLIKASI ---
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
-if data_tuple[0] is None:
+if data_tuple is None or data_tuple[0] is None:
+    st.error("Gagal memuat data. Aplikasi tidak bisa dilanjutkan.")
     st.stop()
 
-info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
+info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df = data_tuple
 
 tab1, tab2 = st.tabs(["**Informasi**", "**Provinsi**"])
 
