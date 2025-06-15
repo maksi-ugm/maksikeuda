@@ -29,7 +29,7 @@ def load_data_from_excel(path="data.xlsx"):
     """Memuat semua data dari sheet di file Excel yang sudah rapi."""
     try:
         xls = pd.ExcelFile(path)
-        # Membaca langsung karena format sudah rapi
+        # Membaca langsung karena format sudah rapi dan standar
         info_df = pd.read_excel(xls, "INFO")
         parameter_df = pd.read_excel(xls, "PARAMETER")
         kinerja_prov_df = pd.read_excel(xls, "KINERJA_PROV")
@@ -39,7 +39,7 @@ def load_data_from_excel(path="data.xlsx"):
         kondisi_kab_df = pd.read_excel(xls, "KONDISI_KAB")
         stat_kab_df = pd.read_excel(xls, "STAT_KAB")
         
-        # Gabungkan data Kab & Kota
+        # Gabungkan data Kab & Kota untuk tab terakhir
         kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df], ignore_index=True)
         kondisi_kabkota_df = pd.concat([kondisi_kab_df, kinerja_kab_df], ignore_index=True)
 
@@ -53,7 +53,7 @@ def load_data_from_excel(path="data.xlsx"):
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI GRAFIK ---
+# --- FUNGSI GRAFIK (VERSI FINAL & SIMPLE) ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
@@ -62,13 +62,17 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
+    # Gambar statistik klaster dari data yang sudah rapi (wide format)
     stat_filtered = stat_df[(stat_df['KLASTER'] == selected_klaster) & (stat_df['INDIKATOR'] == selected_indikator)]
     if not stat_filtered.empty:
         stat_filtered = stat_filtered.sort_values('TAHUN')
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
+        # Cek jika kolom MIN, MAX, MEDIAN ada
+        if all(col in stat_filtered.columns for col in ['MIN', 'MAX', 'MEDIAN']):
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
 
+    # Gambar data utama
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
         pemda_df = main_df[(main_df['PEMDA'] == pemda) & (main_df['INDIKATOR'] == selected_indikator)].copy()
@@ -113,7 +117,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         
         if level == 'Provinsi':
             info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
-        else:
+        else: # Kabupaten/Kota
             info_level_df = info_df[info_df['TINGKAT'].isin(['Kabupaten', 'Kota'])]
         
         daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
