@@ -50,8 +50,8 @@ def load_data_from_excel(path="data.xlsx"):
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI GRAFIK ---
-def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette):
+# --- FUNGSI GRAFIK (DENGAN FILTER TINGKAT) ---
+def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, tingkat_filter):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
         return
@@ -59,12 +59,19 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    stat_filtered = stat_df[(stat_df['KLASTER'] == selected_klaster) & (stat_df['INDIKATOR'] == selected_indikator)]
+    # --- PERBAIKAN: Tambahkan filter berdasarkan TINGKAT ---
+    stat_filtered = stat_df[
+        (stat_df['KLASTER'] == selected_klaster) & 
+        (stat_df['INDIKATOR'] == selected_indikator) &
+        (stat_df['TINGKAT'] == tingkat_filter)
+    ]
+    
     if not stat_filtered.empty:
         stat_filtered = stat_filtered.sort_values('TAHUN')
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
-        fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
+        if all(col in stat_filtered.columns for col in ['MIN', 'MAX', 'MEDIAN']):
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MIN'], mode='lines', line=dict(width=0), hoverinfo='none', showlegend=False))
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MAX'], mode='lines', line=dict(width=0), fill='tonexty', fillcolor='rgba(200, 200, 200, 0.3)', hoverinfo='none', name='Rentang Klaster (Min-Max)', showlegend=True ))
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
 
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
@@ -92,18 +99,18 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     st.plotly_chart(fig, use_container_width=True)
     st.info("""**Keterangan Grafik:**\n- **Area Abu-abu:** Rentang nilai (Min-Max) klaster.\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
 
-# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS (DENGAN LOGIKA BARU) ---
+# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
 def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df):
     filter_col, chart_col = st.columns([1, 3])
 
     with filter_col:
         st.header(f"Filter {level}")
-
-        # --- PERUBAHAN: Tambahkan pilihan tingkat untuk Kab/Kota ---
+        
+        pilihan_tingkat = 'Provinsi' # Default untuk tab Provinsi
         if level == 'Kabupaten/Kota':
             pilihan_tingkat = st.radio("Pilih Tingkat", ('Kabupaten', 'Kota'), key='tingkat_selector', horizontal=True)
             info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
-        else: # Untuk Provinsi
+        else:
             info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
             
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
@@ -117,23 +124,24 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
         
         daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
-        # Tambahkan pengecekan jika daftar klaster kosong
         if not daftar_klaster:
-            st.warning(f"Tidak ada klaster yang tersedia untuk tingkat {pilihan_tingkat if level == 'Kabupaten/Kota' else 'Provinsi'}.")
+            st.warning(f"Tidak ada klaster untuk tingkat {pilihan_tingkat}.")
             selected_klaster = None
         else:
             selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
         
         if selected_klaster:
             daftar_pemda = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
-            selected_pemda = st.multiselect(f"Pilih {level if level == 'Provinsi' else pilihan_tingkat}", daftar_pemda, key=f'pemda_{level.lower()}')
+            # Ganti label multiselect agar lebih dinamis
+            multiselect_label = f"Pilih {pilihan_tingkat if level == 'Kabupaten/Kota' else 'Provinsi'}"
+            selected_pemda = st.multiselect(multiselect_label, daftar_pemda, key=f'pemda_{level.lower()}')
         else:
             selected_pemda = []
 
-
     with chart_col:
         if selected_indikator and selected_klaster:
-            display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette)
+            # Panggil display_chart dengan parameter baru: pilihan_tingkat
+            display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, pilihan_tingkat)
             
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
@@ -151,7 +159,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
 if data_tuple is None or data_tuple[0] is None:
-    st.error("Gagal memuat data. Aplikasi tidak bisa dilanjutkan.")
     st.stop()
 
 info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
@@ -180,4 +187,4 @@ with tab3:
 
 # --- FOOTER CUSTOM ---
 st.markdown("---")
-st.markdown("Dibuat oleh **Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
+st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
