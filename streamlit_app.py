@@ -50,7 +50,7 @@ def load_data_from_excel(path="data.xlsx"):
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
-# --- FUNGSI GRAFIK (DENGAN FILTER TINGKAT) ---
+# --- FUNGSI GRAFIK ---
 def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, tingkat_filter):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
@@ -59,7 +59,6 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    # --- PERBAIKAN: Tambahkan filter berdasarkan TINGKAT ---
     stat_filtered = stat_df[
         (stat_df['KLASTER'] == selected_klaster) & 
         (stat_df['INDIKATOR'] == selected_indikator) &
@@ -106,7 +105,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
     with filter_col:
         st.header(f"Filter {level}")
         
-        pilihan_tingkat = 'Provinsi' # Default untuk tab Provinsi
+        pilihan_tingkat = 'Provinsi'
         if level == 'Kabupaten/Kota':
             pilihan_tingkat = st.radio("Pilih Tingkat", ('Kabupaten', 'Kota'), key='tingkat_selector', horizontal=True)
             info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
@@ -114,8 +113,9 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
             
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
-        chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}')
-        pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}')
+        # --- PERUBAHAN: Filter dibuat horizontal ---
+        chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
+        pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}', horizontal=True)
         
         daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
         if pilihan_data == 'Kondisi': main_df = kondisi_df
@@ -132,7 +132,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         
         if selected_klaster:
             daftar_pemda = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
-            # Ganti label multiselect agar lebih dinamis
             multiselect_label = f"Pilih {pilihan_tingkat if level == 'Kabupaten/Kota' else 'Provinsi'}"
             selected_pemda = st.multiselect(multiselect_label, daftar_pemda, key=f'pemda_{level.lower()}')
         else:
@@ -140,30 +139,38 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 
     with chart_col:
         if selected_indikator and selected_klaster:
-            # Panggil display_chart dengan parameter baru: pilihan_tingkat
             display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, pilihan_tingkat)
             
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
+            # Ini adalah bagian yang akan diubah jika Anda update sheet PARAMETER
             deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
             if not deskripsi_row.empty:
+                # Untuk saat ini, masih mengambil dari satu kolom 'DESKRIPSI'
                 deskripsi = deskripsi_row['DESKRIPSI'].iloc[0]
                 if pd.notna(deskripsi) and deskripsi: st.info(deskripsi)
                 else: st.info("Deskripsi untuk indikator ini tidak tersedia.")
-            else: st.info("Deskripsi untuk indikator ini tidak tersedia.")
+            else:
+                st.info("Deskripsi untuk indikator ini tidak tersedia.")
         else:
             st.info(f"Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
+# --- PERUBAHAN: Tempat untuk paragraf pengantar ---
+st.markdown("""
+Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca
+""")
+
 if data_tuple is None or data_tuple[0] is None:
     st.stop()
 
 info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
 
-tab1, tab2, tab3 = st.tabs(["**Informasi**", "**Provinsi**", "**Kabupaten/Kota**"])
+# --- PERUBAHAN: Judul tab dibuat lebih besar ---
+tab1, tab2, tab3 = st.tabs(["### **Informasi**", "### **Provinsi**", "### **Kabupaten/Kota**"])
 
 with tab1:
     st.header("Informasi Klaster Pemerintah Daerah")
@@ -187,4 +194,5 @@ with tab3:
 
 # --- FOOTER CUSTOM ---
 st.markdown("---")
+st.markdown("Sumber Data : Laporan Hasil Pemeriksaan Badan Pemeriksa Keuangan Republik Indonesia)
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
