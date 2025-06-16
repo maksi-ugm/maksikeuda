@@ -113,7 +113,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
             
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
-        # --- PERUBAHAN: Filter dibuat horizontal ---
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
         pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}', horizontal=True)
         
@@ -138,30 +137,41 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             selected_pemda = []
 
     with chart_col:
-        if selected_indikator and selected_klaster:
+        if selected_indikator and selected_klaster is not None:
             display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, pilihan_tingkat)
             
+            # --- PERUBAHAN: Menampilkan deskripsi terstruktur ---
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
-            # Ini adalah bagian yang akan diubah jika Anda update sheet PARAMETER
             deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
             if not deskripsi_row.empty:
-                # Untuk saat ini, masih mengambil dari satu kolom 'DESKRIPSI'
-                deskripsi = deskripsi_row['DESKRIPSI'].iloc[0]
-                if pd.notna(deskripsi) and deskripsi: st.info(deskripsi)
-                else: st.info("Deskripsi untuk indikator ini tidak tersedia.")
+                definisi = deskripsi_row['DEFINISI'].iloc[0]
+                harapan = deskripsi_row['NILAI_HARAPAN'].iloc[0]
+                rumus = deskripsi_row['RUMUS'].iloc[0]
+
+                if pd.notna(definisi) and definisi:
+                    st.markdown("**Definisi**")
+                    st.info(f"_{definisi}_") # Teks dibuat miring dengan st.info
+                
+                if pd.notna(harapan) and harapan:
+                    st.markdown("**Nilai Harapan**")
+                    st.info(f"_{harapan}_")
+
+                if pd.notna(rumus) and rumus:
+                    st.markdown("**Rumus**")
+                    st.code(rumus, language='text') # Menggunakan st.code untuk rumus
             else:
-                st.info("Deskripsi untuk indikator ini tidak tersedia.")
+                st.warning("Informasi deskripsi untuk indikator ini tidak tersedia.")
         else:
             st.info(f"Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
-# --- PERUBAHAN: Tempat untuk paragraf pengantar ---
+# --- PERUBAHAN: Paragraf pengantar diperbarui ---
 st.markdown("""
-Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca
+Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca.
 """)
 
 if data_tuple is None or data_tuple[0] is None:
@@ -170,7 +180,7 @@ if data_tuple is None or data_tuple[0] is None:
 info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
 
 # --- PERUBAHAN: Judul tab dibuat lebih besar ---
-tab1, tab2, tab3 = st.tabs(["### **Informasi**", "### **Provinsi**", "### **Kabupaten/Kota**"])
+tab1, tab2, tab3 = st.tabs(["#### **Informasi**", "#### **Provinsi**", "#### **Kabupaten/Kota**"])
 
 with tab1:
     st.header("Informasi Klaster Pemerintah Daerah")
@@ -192,7 +202,7 @@ with tab2:
 with tab3:
     create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
 
-# --- FOOTER CUSTOM ---
+# --- PERUBAHAN: Footnote diperbarui ---
 st.markdown("---")
 st.markdown("Sumber Data : Laporan Hasil Pemeriksaan Badan Pemeriksa Keuangan Republik Indonesia")
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
