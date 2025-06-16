@@ -140,27 +140,35 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         if selected_indikator and selected_klaster is not None:
             display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, pilihan_tingkat)
             
-            # --- PERUBAHAN: Menampilkan deskripsi terstruktur ---
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
+            # --- PERUBAHAN: Menampilkan deskripsi dengan lebih baik ---
             deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
             if not deskripsi_row.empty:
-                definisi = deskripsi_row['DEFINISI'].iloc[0]
-                harapan = deskripsi_row['NILAI_HARAPAN'].iloc[0]
-                rumus = deskripsi_row['RUMUS'].iloc[0]
+                # Fungsi untuk mengamankan underscore
+                def escape_md(text):
+                    if isinstance(text, str):
+                        return text.replace('_', '\\_')
+                    return text
 
+                # Ambil setiap data deskripsi
+                definisi = escape_md(deskripsi_row['DEFINISI'].iloc[0])
+                harapan = escape_md(deskripsi_row['NILAI_HARAPAN'].iloc[0])
+                rumus = escape_md(deskripsi_row['RUMUS'].iloc[0])
+
+                # Tampilkan dengan format yang rapi dan seragam
                 if pd.notna(definisi) and definisi:
                     st.markdown("**Definisi**")
-                    st.info(f"_{definisi}_") # Teks dibuat miring dengan st.info
+                    st.info(f"{definisi}")
                 
                 if pd.notna(harapan) and harapan:
                     st.markdown("**Nilai Harapan**")
-                    st.info(f"_{harapan}_")
+                    st.info(f"{harapan}")
 
                 if pd.notna(rumus) and rumus:
                     st.markdown("**Rumus**")
-                    st.code(rumus, language='text') # Menggunakan st.code untuk rumus
+                    st.info(f"`{rumus}`") # Pakai backtick untuk tampilan seperti kode
             else:
                 st.warning("Informasi deskripsi untuk indikator ini tidak tersedia.")
         else:
@@ -169,7 +177,6 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 # --- STRUKTUR UTAMA APLIKASI ---
 st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
 
-# --- PERUBAHAN: Paragraf pengantar diperbarui ---
 st.markdown("""
 Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca.
 """)
@@ -179,7 +186,6 @@ if data_tuple is None or data_tuple[0] is None:
 
 info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df = data_tuple
 
-# --- PERUBAHAN: Judul tab dibuat lebih besar ---
 tab1, tab2, tab3 = st.tabs(["#### **Informasi**", "#### **Provinsi**", "#### **Kabupaten/Kota**"])
 
 with tab1:
@@ -202,7 +208,7 @@ with tab2:
 with tab3:
     create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df)
 
-# --- PERUBAHAN: Footnote diperbarui ---
+# --- FOOTER CUSTOM ---
 st.markdown("---")
 st.markdown("Sumber Data : Laporan Hasil Pemeriksaan Badan Pemeriksa Keuangan Republik Indonesia")
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
