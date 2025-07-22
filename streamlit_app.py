@@ -114,7 +114,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
-        pilihan_data = st.radio("Pilih Jenis Data", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}', horizontal=True)
+        pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}', horizontal=True)
         
         daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
         if pilihan_data == 'Kondisi': main_df = kondisi_df
