@@ -36,7 +36,6 @@ def load_data_from_excel(path="data.xlsx"):
         kinerja_kab_df = pd.read_excel(xls, "KIN_KAB")
         kondisi_kab_df = pd.read_excel(xls, "KONDISI_KAB")
         stat_kab_df = pd.read_excel(xls, "STAT_KAB")
-        # --- PERBAIKAN: Mengubah nama sheet menjadi "TREN" (huruf besar) ---
         tren_df = pd.read_excel(xls, "TREN")
         
         kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df], ignore_index=True)
@@ -97,7 +96,8 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
     
-    st.info("""**Keterangan Grafik:**\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
+    # --- PERUBAHAN: Menghapus baris keterangan grafik di bawah ini ---
+    # st.info("""**Keterangan Grafik:**\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
 
     st.markdown("---")
     st.markdown("### Analisis Tren 3 Tahun Terakhir")
