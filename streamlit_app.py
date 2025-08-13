@@ -254,7 +254,7 @@ else:
 st.title("📊 Dashboard Indeks Maksikeuda")
 
 st.markdown("""
-Dasbor interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
+Dashboard interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
 - **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
 - **Melihat** tren indikator kinerja & kondisi keuangannya dari tahun ke tahun.
 - **Membandingkan** capaiannya dengan pemerintah daerah lain dalam satu klaster.
