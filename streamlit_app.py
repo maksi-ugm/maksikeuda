@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from PIL import Image # <--- Tambahkan import ini
+from PIL import Image
+import base64
+from pathlib import Path
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -197,23 +199,55 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 
 # --- STRUKTUR UTAMA APLIKASI ---
 
-# --- TAMBAHAN: HEADER ---
-# Persiapkan kolom: satu untuk logo, satu untuk teks
-col1, col2 = st.columns([1, 5], vertical_alignment="center")
+# --- HEADER ---
 
-with col1:
-    try:
-        # Buka dan tampilkan file logo
-        logo = Image.open("header.png")
-        st.image(logo, width=120) 
-    except FileNotFoundError:
-        st.error("File 'header.jpg' tidak ditemukan.")
+# 1. Fungsi untuk mengubah gambar menjadi format yang bisa dibaca HTML
+def img_to_base64(img_path_str):
+    img_path = Path(img_path_str)
+    if not img_path.is_file():
+        return None
+    with open(img_path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
-with col2:
-    # Ganti teks di bawah ini sesuai dengan nama fakultas dan universitas Anda
-    st.markdown("## Magister Akuntansi Fakultas Ekonomika dan Bisnis")
-    st.markdown("#### Universitas Gadjah Mada")
-# --- AKHIR TAMBAHAN ---
+# 2. Siapkan path logo dan encode ke Base64
+logo_base64 = img_to_base64("header.png")
+
+# 3. Tampilkan header menggunakan HTML dan CSS kustom jika logo ditemukan
+if logo_base64:
+    st.markdown(f"""
+    <style>
+        /* Menargetkan container utama Streamlit untuk menghilangkan padding atas */
+        div.block-container:first-of-type {{
+            padding: 1rem 1rem 0rem !important; /* Atur: atas | kanan-kiri | bawah */
+        }}
+        /* Membuat wadah header dengan layout flexbox */
+        .custom-header {{
+            display: flex;
+            align-items: center;
+            gap: 12px; /* UBAH INI: untuk mengatur jarak antara logo dan teks */
+            margin-bottom: 20px; /* Jarak header ke judul dashboard di bawahnya */
+        }}
+        /* Menghilangkan margin bawaan dari judul teks */
+        .custom-header h2, .custom-header h4 {{
+            margin: 0;
+            padding: 0;
+            font-weight: 500; /* Atur ketebalan font */
+        }}
+    </style>
+    
+    <div class="custom-header">
+        <img src="data:image/jpeg;base64,{logo_base64}" width="100">
+        <div>
+            <h2>Fakultas Ekonomika dan Bisnis</h2>
+            <h4>Universitas Gadjah Mada</h4>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    # Pesan jika file logo tidak ditemukan
+    st.error("File 'header.png' tidak ditemukan. Pastikan file berada di folder yang sama dengan script.")
+
+# --- AKHIR Header ---
 
 
 st.title("📊 Dashboard Indeks Maksikeuda")
