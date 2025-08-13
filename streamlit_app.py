@@ -238,7 +238,7 @@ if logo_base64:
     <div class="custom-header">
         <img src="data:image/jpeg;base64,{logo_base64}" width="100">
         <div>
-            <h4>Pogram Studi Magister Akuntansi</h4>
+            <h4>Program Studi Magister Akuntansi</h4>
             <h2>Fakultas Ekonomika dan Bisnis</h2>
             <h4>Universitas Gadjah Mada</h4>
         </div>
