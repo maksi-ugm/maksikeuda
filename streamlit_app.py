@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from PIL import Image # <--- Tambahkan import ini
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
@@ -96,9 +97,6 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
     
-    # --- PERUBAHAN: Menghapus baris keterangan grafik di bawah ini ---
-    # st.info("""**Keterangan Grafik:**\n- **Garis Putus-putus:** Nilai tengah (Median) klaster.""")
-
     st.markdown("---")
     st.markdown("### Analisis Tren 3 Tahun Terakhir")
 
@@ -198,7 +196,27 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             st.info(f"Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
-st.title("📊 Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah")
+
+# --- TAMBAHAN: HEADER ---
+# Persiapkan kolom: satu untuk logo, satu untuk teks
+col1, col2 = st.columns([1, 5], vertical_alignment="center")
+
+with col1:
+    try:
+        # Buka dan tampilkan file logo
+        logo = Image.open("header.png")
+        st.image(logo, width=120) 
+    except FileNotFoundError:
+        st.error("File 'header.jpg' tidak ditemukan.")
+
+with col2:
+    # Ganti teks di bawah ini sesuai dengan nama fakultas dan universitas Anda
+    st.markdown("## Magister Akuntansi Fakultas Ekonomika dan Bisnis")
+    st.markdown("#### Universitas Gadjah Mada")
+# --- AKHIR TAMBAHAN ---
+
+
+st.title("📊 Dashboard Indeks Maksikeuda")
 
 st.markdown("""
 Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca.
