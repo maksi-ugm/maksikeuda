@@ -291,4 +291,4 @@ with tab3:
 
 # --- FOOTER CUSTOM ---
 st.markdown("---")
-st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
+st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi FEB UGM**")
