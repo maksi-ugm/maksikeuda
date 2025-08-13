@@ -254,7 +254,12 @@ else:
 st.title("📊 Dashboard Indeks Maksikeuda")
 
 st.markdown("""
-Kinerja keuangan merupakan ukuran prestasi atau upaya aktif organisasi dalam satu periode yang tecermin pada Laporan Realisasi Anggaran/Operasional, sedangkan kondisi keuangan menunjukkan kapasitas melayani yang bersifat pasif dan terakumulasi dari waktu ke waktu sebagaimana tersaji dalam Neraca.
+Dasbor interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
+- **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
+- **Melihat** tren indikator kinerja & kondisi keuangannya dari tahun ke tahun.
+- **Membandingkan** capaiannya dengan pemerintah daerah lain dalam satu klaster.
+- **Mendapatkan** analisis tren otomatis dan deskripsi mendalam untuk setiap indikator.
+- Database dashboard ini disusun berdasarkan data LKPD yang telah diaudit oleh BPK RI.
 """)
 
 if data_tuple is None or data_tuple[0] is None:
@@ -286,5 +291,4 @@ with tab3:
 
 # --- FOOTER CUSTOM ---
 st.markdown("---")
-st.markdown("Sumber Data : Laporan Hasil Pemeriksaan Badan Pemeriksa Keuangan Republik Indonesia")
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi UGM**")
