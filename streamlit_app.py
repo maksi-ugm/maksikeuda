@@ -144,7 +144,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
         pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), key=f'data_type_{level.lower()}', horizontal=True)
         
         daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
-        if pilihan_data == 'Kondisi': main_df = kondisi_df
+        if pilihan_data == 'Kondisi Keuangan': main_df = kondisi_df
         else: main_df = kinerja_df
 
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
