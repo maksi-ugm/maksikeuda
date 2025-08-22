@@ -72,7 +72,7 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     if not stat_filtered.empty:
         stat_filtered = stat_filtered.sort_values('TAHUN')
         if all(col in stat_filtered.columns for col in ['MIN', 'MAX', 'MEDIAN']):
-            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Median Klaster', hoverinfo='x+y'))
+            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Profil Pemda Setara', hoverinfo='x+y'))
 
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
@@ -141,7 +141,7 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
-        pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja', 'Kondisi'), key=f'data_type_{level.lower()}', horizontal=True)
+        pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), key=f'data_type_{level.lower()}', horizontal=True)
         
         daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
         if pilihan_data == 'Kondisi': main_df = kondisi_df
