@@ -22,6 +22,20 @@ hide_st_ui = r"""
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
+            /* Custom CSS for alignment */
+            .title-container {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .custom-header {
+                text-align: right;
+            }
+            .custom-header h4, .custom-header h3 {
+                margin: 0;
+                padding: 0;
+                font-weight: 500;
+            }
             </style>
             """
 st.markdown(hide_st_ui, unsafe_allow_html=True)
@@ -58,33 +72,35 @@ def load_data_from_excel(path="data.xlsx"):
 
 # --- FUNGSI-FUNGSI TAMPILAN ---
 
-def display_header_and_intro():
-    """Menampilkan header dan intro dalam expander yang bisa disembunyikan."""
+def display_custom_header():
+    """Menampilkan header UGM di sisi kanan."""
+    def img_to_base64(img_path_str):
+        img_path = Path(img_path_str)
+        if not img_path.is_file(): return None
+        with open(img_path, "rb") as f: return base64.b64encode(f.read()).decode()
+
+    logo_base64 = img_to_base64("header.png")
+    if logo_base64:
+        st.markdown(f"""
+        <div class="custom-header">
+            <table>
+                <tr>
+                    <td style="text-align: right; vertical-align: middle;">
+                        <h4>Program Studi Magister Akuntansi</h4>
+                        <h3>Fakultas Ekonomika dan Bisnis</h3>
+                        <h4>Universitas Gadjah Mada</h4>
+                    </td>
+                    <td style="padding-left: 10px; vertical-align: middle;">
+                        <img src="data:image/jpeg;base64,{logo_base64}" width="80">
+                    </td>
+                </tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
+
+def display_intro():
+    """Menampilkan teks pengantar dalam expander."""
     with st.expander("Informasi & Detail Dashboard"):
-        def img_to_base64(img_path_str):
-            img_path = Path(img_path_str)
-            if not img_path.is_file(): return None
-            with open(img_path, "rb") as f: return base64.b64encode(f.read()).decode()
-
-        logo_base64 = img_to_base64("header.png")
-        if logo_base64:
-            st.markdown(f"""
-            <style>
-                .custom-header {{ display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }}
-                .custom-header h2, .custom-header h4 {{ margin: 0; padding: 0; font-weight: 500; }}
-            </style>
-            <div class="custom-header">
-                <img src="data:image/jpeg;base64,{logo_base64}" width="100">
-                <div>
-                    <h4>Program Studi Magister Akuntansi</h4>
-                    <h2>Fakultas Ekonomika dan Bisnis</h2>
-                    <h4>Universitas Gadjah Mada</h4>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.error("File 'header.png' tidak ditemukan.")
-
         st.markdown("""
         Dashboard interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
         - **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
@@ -95,15 +111,15 @@ def display_header_and_intro():
         """)
 
 def display_cluster_info(df, tingkat):
-    """Menampilkan tabel informasi klaster beserta search box."""
-    st.subheader("Informasi Klaster")
-    search_term = st.text_input(f"Cari {tingkat}...", key=f"search_{tingkat}")
-    df_tingkat = df[df['TINGKAT'] == tingkat][['PEMDA', 'KLASTER']].reset_index(drop=True)
-    if search_term:
-        df_display = df_tingkat[df_tingkat['PEMDA'].str.contains(search_term, case=False)]
-    else:
-        df_display = df_tingkat
-    st.dataframe(df_display, use_container_width=True, hide_index=True)
+    """Menampilkan tabel informasi klaster dalam expander di kolom kanan."""
+    with st.expander(f"Lihat Daftar Klaster untuk Tingkat {tingkat}"):
+        search_term = st.text_input(f"Cari {tingkat}...", key=f"search_{tingkat}")
+        df_tingkat = df[df['TINGKAT'] == tingkat][['PEMDA', 'KLASTER']].reset_index(drop=True)
+        if search_term:
+            df_display = df_tingkat[df_tingkat['PEMDA'].str.contains(search_term, case=False)]
+        else:
+            df_display = df_tingkat
+        st.dataframe(df_display, use_container_width=True, height=300)
 
 def display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, tingkat_filter, tren_df):
     """Menampilkan grafik utama dan analisisnya."""
@@ -111,7 +127,6 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
         return
 
-    # --- Bagian Grafik ---
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
@@ -149,7 +164,6 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
     
-    # --- Bagian Analisis dalam Expander ---
     with st.expander("Analisis Tren 3 Tahun Terakhir"):
         if not selected_pemda:
             st.write("Pilih pemerintah daerah untuk melihat analisis tren.")
@@ -182,9 +196,22 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
 
 # --- STRUKTUR UTAMA APLIKASI ---
 
-# 1. Tampilkan Header & Judul Utama
-st.title("📊 Dashboard Indeks Maksikeuda")
-display_header_and_intro()
+# 1. Tampilkan Header & Judul Utama dalam satu baris
+st.markdown("""
+<div class="title-container">
+    <div class="main-title">
+        <h1>📊 Dashboard Indeks Maksikeuda</h1>
+    </div>
+    <div class="header-part">
+    </div>
+</div>
+""", unsafe_allow_html=True)
+with st.container(): # Menggunakan container agar bisa menempatkan header setelah title
+    cols = st.columns([1,1])
+    with cols[1]:
+        display_custom_header()
+
+display_intro()
 
 # 2. Muat Data
 data_tuple = load_data_from_excel()
@@ -194,17 +221,12 @@ info_df, parameter_df, indikator_df, median_df, tren_df = data_tuple
 
 # 3. Pilihan Utama Tingkat Pemda
 st.markdown("---")
-st.markdown("#### Langkah 1: Pilih Tingkat Pemerintah Daerah")
-pilihan_tingkat = st.radio("Pilih Tingkat Pemerintah Daerah", ('Provinsi', 'Kabupaten', 'Kota'), horizontal=True, label_visibility="collapsed")
+pilihan_tingkat = st.radio("Pilih Tingkat Pemerintah Daerah", ('Provinsi', 'Kabupaten', 'Kota'), horizontal=True)
 
 # 4. Inisialisasi Layout Utama
-filter_col, chart_col = st.columns([2, 5]) # Rasio diubah agar filter lebih lebar
+filter_col, chart_col = st.columns([2, 5])
 
 with filter_col:
-    st.header(f"Filter {pilihan_tingkat}")
-    
-    # --- Filter Utama ---
-    st.subheader("Filter Utama")
     pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), horizontal=True)
     
     daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
@@ -224,18 +246,13 @@ with filter_col:
         selected_pemda = st.multiselect(f"Pilih {pilihan_tingkat}", pemda_in_klaster)
 
     st.markdown("---")
-    
-    # --- Informasi Klaster ---
-    display_cluster_info(info_df, pilihan_tingkat)
-    
-    st.markdown("---")
-
-    # --- Kustomisasi Tampilan ---
     st.subheader("Kustomisasi Tampilan")
     chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
     color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
 
 with chart_col:
+    display_cluster_info(info_df, pilihan_tingkat)
+    
     if selected_indikator and selected_klaster is not None:
         display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
     else:
