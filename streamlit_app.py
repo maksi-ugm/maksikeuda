@@ -29,25 +29,46 @@ hide_st_ui = r"""
 st.markdown(hide_st_ui, unsafe_allow_html=True) 
 
 # --- FUNGSI MEMUAT DATA ---
+# --- FUNGSI MEMUAT DATA ---
 @st.cache_data
 def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
-        # DIUBAH: Membaca struktur sheet yang baru
         info_df = pd.read_excel(xls, "INFO")
         parameter_df = pd.read_excel(xls, "PARAMETER")
-        indikator_df = pd.read_excel(xls, "INDIKATOR") # BARU: Menggantikan semua sheet KINERJA dan KONDISI
-        median_df = pd.read_excel(xls, "MEDIAN")       # BARU: Menggantikan semua sheet STAT
+        indikator_df = pd.read_excel(xls, "INDIKATOR")
+        median_df = pd.read_excel(xls, "MEDIAN")
         tren_df = pd.read_excel(xls, "TREN")
         
-        # DIHAPUS: Proses concat tidak diperlukan lagi
+        # PENAMBAHAN: Membersihkan spasi ekstra dari kolom kunci untuk mencegah error filter
+        # Ini adalah bagian terpenting dari perbaikan
+        for col in ['PEMDA', 'KLASTER', 'TINGKAT']:
+            if col in info_df.columns:
+                info_df[col] = info_df[col].str.strip()
         
+        for col in ['INDIKATOR', 'JENIS']:
+            if col in parameter_df.columns:
+                parameter_df[col] = parameter_df[col].str.strip()
+
+        for col in ['INDIKATOR', 'PEMDA']:
+            if col in indikator_df.columns:
+                indikator_df[col] = indikator_df[col].str.strip()
+
+        for col in ['INDIKATOR', 'TINGKAT', 'KLASTER']:
+            if col in median_df.columns:
+                median_df[col] = median_df[col].str.strip()
+
+        for col in ['INDIKATOR', 'PEMDA']:
+            if col in tren_df.columns:
+                tren_df[col] = tren_df[col].str.strip()
+
         return (info_df, parameter_df, indikator_df, median_df, tren_df)
 
     except Exception as e:
-        # DIUBAH: Pesan error disesuaikan dengan nama sheet baru
         st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMETER, INDIKATOR, MEDIAN, TREN) sudah benar.")
         return (None,) * 5
+        
+       
 
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
