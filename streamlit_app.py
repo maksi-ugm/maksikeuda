@@ -9,7 +9,7 @@ from pathlib import Path
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
     layout="wide",
-    page_title="Dashboard Kinerja & Kondisi Keuangan Pemerintah Daerah",
+    page_title="Dashboard Keuangan Pemda",
     page_icon="📊"
 )
 
@@ -24,9 +24,9 @@ hide_st_ui = r"""
             header {visibility: hidden;}
             </style>
             """
-st.markdown(hide_st_ui, unsafe_allow_html=True) 
+st.markdown(hide_st_ui, unsafe_allow_html=True)
 
-# --- FUNGSI MEMUAT DATA ---
+# --- FUNGSI MEMUAT DATA (ROBUST VERSION) ---
 @st.cache_data
 def load_data_from_excel(path="data.xlsx"):
     try:
@@ -37,7 +37,6 @@ def load_data_from_excel(path="data.xlsx"):
         median_df = pd.read_excel(xls, "MEDIAN")
         tren_df = pd.read_excel(xls, "TREN")
         
-        # Daftar dataframe dan kolom-kolom string yang perlu dibersihkan
         dataframes_to_clean = {
             'info': (info_df, ['PEMDA', 'KLASTER', 'TINGKAT']),
             'parameter': (parameter_df, ['INDIKATOR', 'JENIS']),
@@ -46,11 +45,9 @@ def load_data_from_excel(path="data.xlsx"):
             'tren': (tren_df, ['INDIKATOR', 'PEMDA'])
         }
 
-        # Proses pembersihan data yang aman
         for df, columns in dataframes_to_clean.values():
             for col in columns:
                 if col in df.columns:
-                    # Konversi ke string dulu untuk menghindari error, lalu hapus spasi
                     df[col] = df[col].astype(str).str.strip()
 
         return info_df, parameter_df, indikator_df, median_df, tren_df
@@ -59,31 +56,70 @@ def load_data_from_excel(path="data.xlsx"):
         st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMETER, INDIKATOR, MEDIAN, TREN) sudah benar.")
         return (None,) * 5
 
-# --- FUNGSI GRAFIK ---
+# --- FUNGSI-FUNGSI TAMPILAN ---
+
+def display_header_and_intro():
+    """Menampilkan header dan intro dalam expander yang bisa disembunyikan."""
+    with st.expander("Informasi & Detail Dashboard"):
+        def img_to_base64(img_path_str):
+            img_path = Path(img_path_str)
+            if not img_path.is_file(): return None
+            with open(img_path, "rb") as f: return base64.b64encode(f.read()).decode()
+
+        logo_base64 = img_to_base64("header.png")
+        if logo_base64:
+            st.markdown(f"""
+            <style>
+                .custom-header {{ display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }}
+                .custom-header h2, .custom-header h4 {{ margin: 0; padding: 0; font-weight: 500; }}
+            </style>
+            <div class="custom-header">
+                <img src="data:image/jpeg;base64,{logo_base64}" width="100">
+                <div>
+                    <h4>Program Studi Magister Akuntansi</h4>
+                    <h2>Fakultas Ekonomika dan Bisnis</h2>
+                    <h4>Universitas Gadjah Mada</h4>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.error("File 'header.png' tidak ditemukan.")
+
+        st.markdown("""
+        Dashboard interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
+        - **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
+        - **Melihat** tren indikator kinerja & kondisi keuangannya dari tahun ke tahun.
+        - **Membandingkan** capaiannya dengan pemerintah daerah lain dalam satu klaster.
+        - **Mendapatkan** analisis tren otomatis dan deskripsi mendalam untuk setiap indikator.
+        - Database dashboard ini disusun berdasarkan data LKPD yang telah diaudit oleh BPK RI.
+        """)
+
+def display_cluster_info(df, tingkat):
+    """Menampilkan tabel informasi klaster beserta search box."""
+    st.subheader("Informasi Klaster")
+    search_term = st.text_input(f"Cari {tingkat}...", key=f"search_{tingkat}")
+    df_tingkat = df[df['TINGKAT'] == tingkat][['PEMDA', 'KLASTER']].reset_index(drop=True)
+    if search_term:
+        df_display = df_tingkat[df_tingkat['PEMDA'].str.contains(search_term, case=False)]
+    else:
+        df_display = df_tingkat
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
+
 def display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, tingkat_filter, tren_df):
+    """Menampilkan grafik utama dan analisisnya."""
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
         return
 
+    # --- Bagian Grafik ---
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    median_filtered = median_df[
-        (median_df['KLASTER'] == selected_klaster) & 
-        (median_df['INDIKATOR'] == selected_indikator) &
-        (median_df['TINGKAT'] == tingkat_filter)
-    ]
+    median_filtered = median_df[(median_df['KLASTER'] == selected_klaster) & (median_df['INDIKATOR'] == selected_indikator) & (median_df['TINGKAT'] == tingkat_filter)]
     
     if not median_filtered.empty:
         median_filtered = median_filtered.sort_values('TAHUN')
-        fig.add_trace(go.Scatter(
-            x=median_filtered['TAHUN'], 
-            y=median_filtered['MEDIAN'], 
-            mode='lines', 
-            line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), 
-            name='Profil Pemda Setara',
-            hoverinfo='x+y'
-        ))
+        fig.add_trace(go.Scatter(x=median_filtered['TAHUN'], y=median_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Profil Pemda Setara', hoverinfo='x+y'))
 
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
@@ -108,176 +144,103 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
             elif chart_type == 'Batang':
                 fig.add_trace(go.Bar(x=df_plot['TAHUN'], y=df_plot['NILAI_NUMERIC'], name=pemda, marker_color=color))
 
-    for ann in annotations_to_add:
-        fig.add_annotation(ann)
+    for ann in annotations_to_add: fig.add_annotation(ann)
 
     fig.update_layout(title=f'<b>{selected_indikator}</b>', xaxis_title='Tahun', yaxis_title='Nilai', template='plotly_white', legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
     
-    st.markdown("---")
-    st.markdown("### Analisis Tren 3 Tahun Terakhir")
-
-    if not selected_pemda:
-        st.write("Pilih pemerintah daerah untuk melihat analisis tren.")
-        return
-
-    for pemda in selected_pemda:
-        tren_data = tren_df[
-            (tren_df['INDIKATOR'] == selected_indikator) & 
-            (tren_df['PEMDA'] == pemda)
-        ]
-
-        if not tren_data.empty:
-            nilai_tren = tren_data['NILAI'].iloc[0]
+    # --- Bagian Analisis dalam Expander ---
+    with st.expander("Analisis Tren 3 Tahun Terakhir"):
+        if not selected_pemda:
+            st.write("Pilih pemerintah daerah untuk melihat analisis tren.")
+        else:
+            for pemda in selected_pemda:
+                tren_data = tren_df[(tren_df['INDIKATOR'] == selected_indikator) & (tren_df['PEMDA'] == pemda)]
+                if not tren_data.empty:
+                    nilai_tren = tren_data['NILAI'].iloc[0]
+                    if nilai_tren.lower() == 'hijau': st.success(f"**Baik (Favorable)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **kenaikan**.")
+                    elif nilai_tren.lower() == 'kuning': st.warning(f"**Tidak Pasti (Uncertain)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **fluktuasi**.")
+                    elif nilai_tren.lower() == 'merah': st.error(f"**Tidak Baik (Unfavorable)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **penurunan**.")
+                else:
+                    st.markdown(f"- Analisis tren untuk **{pemda}** pada indikator ini tidak tersedia.")
+    
+    with st.expander(f"Deskripsi Indikator: {selected_indikator}"):
+        deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
+        if not deskripsi_row.empty:
+            def escape_md(text):
+                return str(text).replace('_', '\\_') if isinstance(text, str) else text
             
-            if nilai_tren.lower() == 'hijau':
-                st.success(f"**Baik/Diharapkan (Favorable)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **kenaikan** pada 3 tahun terakhir.")
-            elif nilai_tren.lower() == 'kuning':
-                st.warning(f"**Tidak Pasti (Uncertain)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **fluktuasi** (naik dan turun) pada 3 tahun terakhir.")
-            elif nilai_tren.lower() == 'merah':
-                st.error(f"**Tidak Baik/Tidak Diharapkan (Unfavorable)**: Indikator **{selected_indikator}** pada **{pemda}** menunjukkan tren **penurunan** pada 3 tahun terakhir.")
+            definisi = escape_md(deskripsi_row['DEFINISI'].iloc[0])
+            harapan = escape_md(deskripsi_row['NILAI_HARAPAN'].iloc[0])
+            rumus = escape_md(deskripsi_row['RUMUS'].iloc[0])
+
+            if pd.notna(definisi) and definisi: st.info(f"**Definisi**: {definisi}")
+            if pd.notna(harapan) and harapan: st.info(f"**Nilai Harapan**: {harapan}")
+            if pd.notna(rumus) and rumus: st.info(f"**Rumus**: `{rumus}`")
         else:
-            st.markdown(f"- Analisis tren untuk **{pemda}** pada indikator ini tidak tersedia.")
-
-# --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
-def create_analysis_tab(level, info_df, parameter_df, indikator_df, median_df, tren_df):
-    filter_col, chart_col = st.columns([1, 3])
-
-    with filter_col:
-        st.header(f"Filter {level}")
-        
-        pilihan_tingkat = 'Provinsi'
-        if level == 'Kabupaten/Kota':
-            pilihan_tingkat = st.radio("Pilih Tingkat", ('Kabupaten', 'Kota'), key='tingkat_selector', horizontal=True)
-            info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
-        else:
-            info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
-        
-        color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
-        chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
-        pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), key=f'data_type_{level.lower()}', horizontal=True)
-        
-        daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
-        selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
-        
-        daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
-        if not daftar_klaster:
-            st.warning(f"Tidak ada klaster untuk tingkat {pilihan_tingkat}.")
-            selected_klaster = None
-        else:
-            selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster, key=f'klaster_{level.lower()}')
-        
-        if selected_klaster:
-            daftar_pemda = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
-            multiselect_label = f"Pilih {pilihan_tingkat if level == 'Kabupaten/Kota' else 'Provinsi'}"
-            selected_pemda = st.multiselect(multiselect_label, daftar_pemda, key=f'pemda_{level.lower()}')
-        else:
-            selected_pemda = []
-
-    with chart_col:
-        if selected_indikator and selected_klaster is not None:
-            display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
-            
-            st.markdown("---")
-            st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
-            
-            deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
-            if not deskripsi_row.empty:
-                def escape_md(text):
-                    if isinstance(text, str):
-                        return text.replace('_', '\\_')
-                    return text
-
-                definisi = escape_md(deskripsi_row['DEFINISI'].iloc[0])
-                harapan = escape_md(deskripsi_row['NILAI_HARAPAN'].iloc[0])
-                rumus = escape_md(deskripsi_row['RUMUS'].iloc[0])
-
-                if pd.notna(definisi) and definisi:
-                    st.markdown("**Definisi**")
-                    st.info(f"{definisi}")
-                
-                if pd.notna(harapan) and harapan:
-                    st.markdown("**Nilai Harapan**")
-                    st.info(f"{harapan}")
-
-                if pd.notna(rumus) and rumus:
-                    st.markdown("**Rumus**")
-                    st.info(f"`{rumus}`")
-            else:
-                st.warning("Informasi deskripsi untuk indikator ini tidak tersedia.")
-        else:
-            st.info("Silakan lengkapi semua filter di kolom kiri untuk menampilkan data.")
-
-# --- FUNGSI UNTUK MENGELOLA HEADER ---
-def display_header():
-    def img_to_base64(img_path_str):
-        img_path = Path(img_path_str)
-        if not img_path.is_file(): return None
-        with open(img_path, "rb") as f: return base64.b64encode(f.read()).decode()
-
-    logo_base64 = img_to_base64("header.png")
-    if logo_base64:
-        st.markdown(f"""
-        <style>
-            div.block-container:first-of-type {{ padding: 1rem 1rem 0rem !important; }}
-            .custom-header {{ display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }}
-            .custom-header h2, .custom-header h4 {{ margin: 0; padding: 0; font-weight: 500; }}
-        </style>
-        <div class="custom-header">
-            <img src="data:image/jpeg;base64,{logo_base64}" width="100">
-            <div>
-                <h4>Program Studi Magister Akuntansi</h4>
-                <h2>Fakultas Ekonomika dan Bisnis</h2>
-                <h4>Universitas Gadjah Mada</h4>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.error("File 'header.png' tidak ditemukan. Pastikan file berada di folder yang sama dengan script.")
+            st.warning("Informasi deskripsi untuk indikator ini tidak tersedia.")
 
 # --- STRUKTUR UTAMA APLIKASI ---
-display_header()
 
+# 1. Tampilkan Header & Judul Utama
 st.title("📊 Dashboard Indeks Maksikeuda")
-st.markdown("""
-Dashboard interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
-- **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
-- **Melihat** tren indikator kinerja & kondisi keuangannya dari tahun ke tahun.
-- **Membandingkan** capaiannya dengan pemerintah daerah lain dalam satu klaster.
-- **Mendapatkan** analisis tren otomatis dan deskripsi mendalam untuk setiap indikator.
-- Database dashboard ini disusun berdasarkan data LKPD yang telah diaudit oleh BPK RI.
-""")
+display_header_and_intro()
 
+# 2. Muat Data
 data_tuple = load_data_from_excel()
-
 if data_tuple[0] is None:
     st.stop()
-
 info_df, parameter_df, indikator_df, median_df, tren_df = data_tuple
 
-tab1, tab2, tab3 = st.tabs(["#### **Informasi**", "#### **Provinsi**", "#### **Kabupaten/Kota**"])
+# 3. Pilihan Utama Tingkat Pemda
+st.markdown("---")
+st.markdown("#### Langkah 1: Pilih Tingkat Pemerintah Daerah")
+pilihan_tingkat = st.radio("Pilih Tingkat Pemerintah Daerah", ('Provinsi', 'Kabupaten', 'Kota'), horizontal=True, label_visibility="collapsed")
 
-with tab1:
-    st.header("Informasi Klaster Pemerintah Daerah")
-    st.markdown("Gunakan kotak pencarian untuk menemukan pemerintah daerah di dalam setiap klaster.")
-    col1, col2, col3 = st.columns(3, gap="large")
-    for i, tingkat in enumerate(['Provinsi', 'Kabupaten', 'Kota']):
-        with [col1, col2, col3][i]:
-            st.subheader(f"Klaster {tingkat}")
-            df_tingkat = info_df[info_df['TINGKAT'] == tingkat][['PEMDA', 'KLASTER']].reset_index(drop=True)
-            label_pencarian = f"Cari {tingkat}..."
-            search_term = st.text_input(label_pencarian, key=f"search_{tingkat}")
-            if search_term:
-                df_display = df_tingkat[df_tingkat['PEMDA'].str.contains(search_term, case=False)]
-            else:
-                df_display = df_tingkat
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+# 4. Inisialisasi Layout Utama
+filter_col, chart_col = st.columns([2, 5]) # Rasio diubah agar filter lebih lebar
 
-with tab2:
-    create_analysis_tab("Provinsi", info_df, parameter_df, indikator_df, median_df, tren_df)
+with filter_col:
+    st.header(f"Filter {pilihan_tingkat}")
+    
+    # --- Filter Utama ---
+    st.subheader("Filter Utama")
+    pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), horizontal=True)
+    
+    daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
+    selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator)
+    
+    info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
+    daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
+    
+    if not daftar_klaster:
+        st.warning(f"Tidak ada data klaster untuk tingkat {pilihan_tingkat}.")
+        selected_klaster = None
+        selected_pemda = []
+    else:
+        selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster)
+        
+        pemda_in_klaster = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
+        selected_pemda = st.multiselect(f"Pilih {pilihan_tingkat}", pemda_in_klaster)
 
-with tab3:
-    create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, indikator_df, median_df, tren_df)
+    st.markdown("---")
+    
+    # --- Informasi Klaster ---
+    display_cluster_info(info_df, pilihan_tingkat)
+    
+    st.markdown("---")
 
+    # --- Kustomisasi Tampilan ---
+    st.subheader("Kustomisasi Tampilan")
+    chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
+    color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
+
+with chart_col:
+    if selected_indikator and selected_klaster is not None:
+        display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
+    else:
+        st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
+
+# --- FOOTER ---
 st.markdown("---")
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi FEB UGM**")
