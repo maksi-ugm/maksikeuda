@@ -249,5 +249,9 @@ with chart_col:
     else:
         st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
 
-st.markdown("---")
-st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi FEB UGM**")
+st.markdown("""
+<div style="text-align: center; padding: 1rem 0;">
+    Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
+    <a href="https://hakcipta.dgip.go.id/legal/c/Zjg5NzI5NDkyYTQxZDk1OGNlNjY0MWVjMDNjZGFmNzE=" target="_blank">Lihat Sertifikat HKI</a>
+</div>
+""", unsafe_allow_html=True)
