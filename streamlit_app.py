@@ -1,3 +1,5 @@
+# [MULAI] KODE LENGKAP
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -31,31 +33,28 @@ st.markdown(hide_st_ui, unsafe_allow_html=True)
 def load_data_from_excel(path="data.xlsx"):
     try:
         xls = pd.ExcelFile(path)
+        # DIUBAH: Membaca struktur sheet yang baru
         info_df = pd.read_excel(xls, "INFO")
         parameter_df = pd.read_excel(xls, "PARAMETER")
-        kinerja_prov_df = pd.read_excel(xls, "KINERJA_PROV")
-        kondisi_prov_df = pd.read_excel(xls, "KONDISI_PROV")
-        stat_prov_df = pd.read_excel(xls, "STAT_PROV")
-        kinerja_kab_df = pd.read_excel(xls, "KIN_KAB")
-        kondisi_kab_df = pd.read_excel(xls, "KONDISI_KAB")
-        stat_kab_df = pd.read_excel(xls, "STAT_KAB")
+        indikator_df = pd.read_excel(xls, "INDIKATOR") # BARU: Menggantikan semua sheet KINERJA dan KONDISI
+        median_df = pd.read_excel(xls, "MEDIAN")       # BARU: Menggantikan semua sheet STAT
         tren_df = pd.read_excel(xls, "TREN")
         
-        kinerja_kabkota_df = pd.concat([kinerja_kab_df, kondisi_kab_df], ignore_index=True)
-        kondisi_kabkota_df = pd.concat([kondisi_kab_df, kinerja_kab_df], ignore_index=True)
-
-        return (info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, 
-                kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df, tren_df)
+        # DIHAPUS: Proses concat tidak diperlukan lagi
+        
+        return (info_df, parameter_df, indikator_df, median_df, tren_df)
 
     except Exception as e:
-        st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMETER, TREN, dll.) sudah benar.")
-        return (None,) * 9
+        # DIUBAH: Pesan error disesuaikan dengan nama sheet baru
+        st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMETER, INDIKATOR, MEDIAN, TREN) sudah benar.")
+        return (None,) * 5
 
 # --- MEMUAT DATA DI AWAL ---
 data_tuple = load_data_from_excel()
 
 # --- FUNGSI GRAFIK ---
-def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, tingkat_filter, tren_df):
+# DIUBAH: Signature fungsi disesuaikan dengan dataframe baru
+def display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, tingkat_filter, tren_df):
     if not selected_pemda:
         st.warning("Silakan pilih minimal satu pemerintah daerah untuk menampilkan grafik.")
         return
@@ -63,20 +62,29 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
     fig = go.Figure()
     colors = px.colors.qualitative.Plotly if color_palette == 'Default' else getattr(px.colors.qualitative, color_palette)
     
-    stat_filtered = stat_df[
-        (stat_df['KLASTER'] == selected_klaster) & 
-        (stat_df['INDIKATOR'] == selected_indikator) &
-        (stat_df['TINGKAT'] == tingkat_filter)
+    # DIUBAH: Logika untuk memfilter data median/statistik
+    median_filtered = median_df[
+        (median_df['KLASTER'] == selected_klaster) & 
+        (median_df['INDIKATOR'] == selected_indikator) &
+        (median_df['TINGKAT'] == tingkat_filter)
     ]
     
-    if not stat_filtered.empty:
-        stat_filtered = stat_filtered.sort_values('TAHUN')
-        if all(col in stat_filtered.columns for col in ['MIN', 'MAX', 'MEDIAN']):
-            fig.add_trace(go.Scatter(x=stat_filtered['TAHUN'], y=stat_filtered['MEDIAN'], mode='lines', line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), name='Profil Pemda Setara', hoverinfo='x+y'))
+    # DIUBAH: Plotting hanya untuk MEDIAN, MIN-MAX dihilangkan
+    if not median_filtered.empty:
+        median_filtered = median_filtered.sort_values('TAHUN')
+        fig.add_trace(go.Scatter(
+            x=median_filtered['TAHUN'], 
+            y=median_filtered['MEDIAN'], 
+            mode='lines', 
+            line=dict(color='rgba(200, 200, 200, 0.8)', width=2, dash='dash'), 
+            name='Profil Pemda Setara',  # Sesuai permintaan
+            hoverinfo='x+y'
+        ))
 
     annotations_to_add = []
     for i, pemda in enumerate(selected_pemda):
-        pemda_df = main_df[(main_df['PEMDA'] == pemda) & (main_df['INDIKATOR'] == selected_indikator)].copy()
+        # DIUBAH: Pemfilteran sekarang dari satu dataframe utama 'indikator_df'
+        pemda_df = indikator_df[(indikator_df['PEMDA'] == pemda) & (indikator_df['INDIKATOR'] == selected_indikator)].copy()
         if pemda_df.empty: continue
         
         pemda_df['NILAI_NUMERIC'] = pd.to_numeric(pemda_df['NILAI'], errors='coerce')
@@ -126,7 +134,8 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, main_df,
 
 
 # --- FUNGSI UNTUK MEMBUAT TAB ANALISIS ---
-def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, stat_df, tren_df):
+# DIUBAH: Signature fungsi disesuaikan dengan dataframe baru
+def create_analysis_tab(level, info_df, parameter_df, indikator_df, median_df, tren_df):
     filter_col, chart_col = st.columns([1, 3])
 
     with filter_col:
@@ -138,15 +147,16 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
             info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
         else:
             info_level_df = info_df[info_df['TINGKAT'] == 'Provinsi']
-            
+        
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'], key=f'color_{level.lower()}')
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), key=f'chart_{level.lower()}', horizontal=True)
         pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), key=f'data_type_{level.lower()}', horizontal=True)
         
+        # DIUBAH: Logika untuk memfilter daftar indikator berdasarkan 'JENIS' dari sheet PARAMETER
         daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
-        if pilihan_data == 'Kondisi Keuangan': main_df = kondisi_df
-        else: main_df = kinerja_df
-
+        
+        # DIHAPUS: Pemilihan main_df tidak diperlukan lagi, sumber data selalu 'indikator_df'
+        
         selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator, key=f'indikator_{level.lower()}')
         
         daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
@@ -165,13 +175,15 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 
     with chart_col:
         if selected_indikator and selected_klaster is not None:
-            display_chart(selected_pemda, selected_indikator, selected_klaster, main_df, stat_df, chart_type, color_palette, pilihan_tingkat, tren_df)
+            # DIUBAH: Memanggil display_chart dengan argumen dataframe yang baru
+            display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
             
             st.markdown("---")
             st.markdown(f"### Deskripsi Indikator: {selected_indikator}")
             
             deskripsi_row = parameter_df.loc[parameter_df['INDIKATOR'] == selected_indikator]
             if not deskripsi_row.empty:
+                # Fungsi escape_md tidak perlu diubah
                 def escape_md(text):
                     if isinstance(text, str):
                         return text.replace('_', '\\_')
@@ -200,41 +212,19 @@ def create_analysis_tab(level, info_df, parameter_df, kinerja_df, kondisi_df, st
 # --- STRUKTUR UTAMA APLIKASI ---
 
 # --- HEADER ---
-
-# 1. Fungsi untuk mengubah gambar menjadi format yang bisa dibaca HTML
 def img_to_base64(img_path_str):
     img_path = Path(img_path_str)
-    if not img_path.is_file():
-        return None
-    with open(img_path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
+    if not img_path.is_file(): return None
+    with open(img_path, "rb") as f: return base64.b64encode(f.read()).decode()
 
-# 2. Siapkan path logo dan encode ke Base64
 logo_base64 = img_to_base64("header.png")
-
-# 3. Tampilkan header menggunakan HTML dan CSS kustom jika logo ditemukan
 if logo_base64:
     st.markdown(f"""
     <style>
-        /* Menargetkan container utama Streamlit untuk menghilangkan padding atas */
-        div.block-container:first-of-type {{
-            padding: 1rem 1rem 0rem !important; /* Atur: atas | kanan-kiri | bawah */
-        }}
-        /* Membuat wadah header dengan layout flexbox */
-        .custom-header {{
-            display: flex;
-            align-items: center;
-            gap: 12px; /* UBAH INI: untuk mengatur jarak antara logo dan teks */
-            margin-bottom: 20px; /* Jarak header ke judul dashboard di bawahnya */
-        }}
-        /* Menghilangkan margin bawaan dari judul teks */
-        .custom-header h2, .custom-header h4 {{
-            margin: 0;
-            padding: 0;
-            font-weight: 500; /* Atur ketebalan font */
-        }}
+        div.block-container:first-of-type {{ padding: 1rem 1rem 0rem !important; }}
+        .custom-header {{ display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }}
+        .custom-header h2, .custom-header h4 {{ margin: 0; padding: 0; font-weight: 500; }}
     </style>
-    
     <div class="custom-header">
         <img src="data:image/jpeg;base64,{logo_base64}" width="100">
         <div>
@@ -245,27 +235,25 @@ if logo_base64:
     </div>
     """, unsafe_allow_html=True)
 else:
-    # Pesan jika file logo tidak ditemukan
     st.error("File 'header.png' tidak ditemukan. Pastikan file berada di folder yang sama dengan script.")
 
 # --- AKHIR Header ---
 
-
 st.title("📊 Dashboard Indeks Maksikeuda")
-
 st.markdown("""
 Dashboard interaktif ini dirancang untuk membantu Anda menganalisis data keuangan pemerintah daerah. Anda dapat:
 - **Memilih** pemerintah daerah (Provinsi, Kabupaten, atau Kota).
 - **Melihat** tren indikator kinerja & kondisi keuangannya dari tahun ke tahun.
 - **Membandingkan** capaiannya dengan pemerintah daerah lain dalam satu klaster.
 - **Mendapatkan** analisis tren otomatis dan deskripsi mendalam untuk setiap indikator.
-- Database dashboard ini disusun berdasarkan data LKPD yang telah diaudit oleh BPK RI.
+- Database dashboard ini disusun berdasarkan data LKPD yang telah diaudit oleh BPK RI.
 """)
 
 if data_tuple is None or data_tuple[0] is None:
     st.stop()
 
-info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df, tren_df = data_tuple
+# DIUBAH: Unpacking tuple data sesuai dengan struktur baru
+info_df, parameter_df, indikator_df, median_df, tren_df = data_tuple
 
 tab1, tab2, tab3 = st.tabs(["#### **Informasi**", "#### **Provinsi**", "#### **Kabupaten/Kota**"])
 
@@ -284,11 +272,15 @@ with tab1:
             st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 with tab2:
-    create_analysis_tab("Provinsi", info_df, parameter_df, kinerja_prov_df, kondisi_prov_df, stat_prov_df, tren_df)
+    # DIUBAH: Memanggil create_analysis_tab dengan argumen dataframe yang baru
+    create_analysis_tab("Provinsi", info_df, parameter_df, indikator_df, median_df, tren_df)
 
 with tab3:
-    create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, kinerja_kabkota_df, kondisi_kabkota_df, stat_kab_df, tren_df)
+    # DIUBAH: Memanggil create_analysis_tab dengan argumen dataframe yang baru
+    create_analysis_tab("Kabupaten/Kota", info_df, parameter_df, indikator_df, median_df, tren_df)
 
 # --- FOOTER CUSTOM ---
 st.markdown("---")
 st.markdown("Dibuat oleh **Mahasiswa Konsentrasi Akuntansi Sektor Publik, Magister Akuntansi FEB UGM**")
+
+# [AKHIR] KODE LENGKAP
