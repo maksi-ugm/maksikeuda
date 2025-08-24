@@ -132,6 +132,9 @@ def display_cluster_info_in_sidebar(df, tingkat):
             df_display = df_tingkat[df_tingkat['PEMDA'].str.contains(search_term, case=False)]
         else:
             df_display = df_tingkat
+        
+        # KOREKSI: Mengatur indeks agar dimulai dari 1
+        df_display.index = range(1, len(df_display) + 1)
         st.dataframe(df_display, use_container_width=True, height=300)
 
 def display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, tingkat_filter, tren_df):
@@ -225,7 +228,15 @@ with filter_col:
     selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator)
     
     info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
-    daftar_klaster = sorted(info_level_df['KLASTER'].dropna().unique())
+    
+    # KOREKSI: Mengambil daftar klaster dan mengurutkannya secara numerik
+    unique_klaster = info_level_df['KLASTER'].dropna().unique()
+    try:
+        # Coba urutkan sebagai angka jika memungkinkan
+        daftar_klaster = sorted(unique_klaster, key=int)
+    except ValueError:
+        # Jika ada klaster non-numerik, urutkan sebagai teks biasa
+        daftar_klaster = sorted(unique_klaster)
     
     if not daftar_klaster:
         st.warning(f"Tidak ada data klaster untuk tingkat {pilihan_tingkat}.")
@@ -249,6 +260,7 @@ with chart_col:
     else:
         st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
 
+st.markdown("---")
 st.markdown("""
 <div style="text-align: center; padding: 1rem 0;">
     Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
