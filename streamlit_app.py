@@ -43,7 +43,7 @@ def check_login():
                 if username in users_db and users_db[username] == password:
                     st.session_state.logged_in = True
                     st.session_state.username = username # Simpan username untuk sapaan
-                    st.experimental_rerun()  # Muat ulang aplikasi setelah login berhasil
+                    st.rerun()  # <-- DIUBAH: dari st.experimental_rerun()
                 else:
                     st.error("Username atau Password salah.")
         
@@ -54,7 +54,7 @@ def check_login():
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.pop('username', None) # Hapus username dari state
-        st.experimental_rerun() # Muat ulang untuk kembali ke form login
+        st.rerun() # <-- DIUBAH: dari st.experimental_rerun()
         
     return True # Izinkan eksekusi sisa skrip
 
@@ -85,7 +85,7 @@ def load_data_from_excel(path="data.xlsx"):
         return info_df, parameter_df, indikator_df, median_df, tren_df
 
     except Exception as e:
-        st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMETER, INDIKATOR, MEDIAN, TREN) sudah benar.")
+        st.error(f"Terjadi error fatal saat memuat data: {e}. Pastikan file 'data.xlsx' dan semua sheet di dalamnya (INFO, PARAMTER, INDIKATOR, MEDIAN, TREN) sudah benar.")
         return (None,) * 5
 
 # --- FUNGSI-FUNGSI TAMPILAN ---
