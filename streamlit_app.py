@@ -44,6 +44,10 @@ def check_login():
                     st.error("Username atau Password salah.")
         
         return False
+    
+    # --- INFO LOGIN TETAP DI SIDEBAR ---
+    st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
+    # Tombol Logout dihapus dari sini
         
     return True
 
@@ -293,19 +297,32 @@ if check_login():
         else:
             st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
 
-    # --- KODE LOGOUT DIPINDAHKAN KE SINI (DI LUAR KOLOM) ---
-    # Ini akan menambahkannya ke sidebar, dijamin paling bawah.
-    st.sidebar.markdown("---")
-    st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.pop('username', None) 
-        st.rerun()
-
+    
+    # --- BLOK HKI DAN LOGOUT (MENGGANTIKAN BLOK HKI YANG LAMA) ---
     st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem 0;">
-        Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
-        <a href="https://hakcipta.dgip.go.id/legal/c/Zjg5NzI5NDkyYTQxZDk1OGNlNjY0MWVjMDNjZGFmNzE=" target="_blank">Lihat Sertifikat HKI</a>
-    </div>
-    """, unsafe_allow_html=True)
+    
+    # Buat dua kolom: 70% untuk HKI, 30% untuk tombol Logout
+    col_footer_1, col_footer_2 = st.columns([0.7, 0.3])
+    
+    with col_footer_1:
+        # Tampilkan HKI di kolom kiri
+        st.markdown("""
+        <div style="text-align: left; padding: 1rem 0;">
+            Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
+            <a href="https://hakcipta.dgip.go.id/legal/c/Zjg5NzI5NDkyYTQxZDk1OGNlNjY0MWVjMDNjZGFmNzE=" target="_blank">Lihat Sertifikat HKI</a>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_footer_2:
+        # Tampilkan tombol Logout di kolom kanan
+        # Kita tambahkan 2x <br> (baris baru) agar tombolnya
+        # secara visual agak turun, sejajar dengan teks HKI.
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        if st.button("Logout", key="logout_button_main"):
+            st.session_state.logged_in = False
+            st.session_state.pop('username', None) 
+            st.rerun()
+
+    # --- BLOK HKI YANG LAMA (SUDAH DIHAPUS/DIGANTI) ---
+    # st.markdown("---")
+    # st.markdown(""" ...HAK CIPTA LAMA... """, unsafe_allow_html=True)
