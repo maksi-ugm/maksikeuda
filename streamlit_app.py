@@ -44,10 +44,6 @@ def check_login():
                     st.error("Username atau Password salah.")
         
         return False
-    
-    # --- KODE LOGOUT DIHAPUS DARI SINI ---
-    # Kita pindahkan ke bagian utama aplikasi
-    # agar bisa diletakkan di paling bawah sidebar.
         
     return True
 
@@ -236,7 +232,7 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
                 return str(text).replace('_', '\\_') if isinstance(text, str) else text
             
             definisi = escape_md(deskripsi_row['DEFINISI'].iloc[0])
-            harapan = escape_dim(deskripsi_row['NILAI_HARAPAN'].iloc[0])
+            harapan = escape_md(deskripsi_row['NILAI_HARAPAN'].iloc[0])
             rumus = escape_md(deskripsi_row['RUMUS'].iloc[0])
 
             if pd.notna(definisi) and definisi: st.info(f"**Definisi**: {definisi}")
@@ -291,20 +287,20 @@ if check_login():
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
 
-        # --- KODE LOGOUT DIPINDAHKAN KE SINI ---
-        # Ini akan menampilkannya di sidebar, di bawah semua elemen lain.
-        st.sidebar.markdown("---")
-        st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
-        if st.sidebar.button("Logout"):
-            st.session_state.logged_in = False
-            st.session_state.pop('username', None) 
-            st.rerun()
-
     with chart_col:
         if selected_indikator and selected_klaster is not None:
             display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
         else:
             st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
+
+    # --- KODE LOGOUT DIPINDAHKAN KE SINI (DI LUAR KOLOM) ---
+    # Ini akan menambahkannya ke sidebar, dijamin paling bawah.
+    st.sidebar.markdown("---")
+    st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.pop('username', None) 
+        st.rerun()
 
     st.markdown("---")
     st.markdown("""
