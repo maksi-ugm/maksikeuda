@@ -17,18 +17,15 @@ st.set_page_config(
 def check_login():
     """Fungsi untuk menampilkan form login dan validasi."""
     
-    # 1. Cek apakah 'logged_in' sudah ada di session state
     if 'logged_in' not in st.session_state:
         st.session_state.logged_in = False
     
-    # 2. Ambil daftar user dari st.secrets
     try:
         users_db = st.secrets['credentials']['users']
     except (KeyError, FileNotFoundError):
         st.error("Error: Konfigurasi 'secrets' untuk kredensial user belum diatur oleh admin.")
         return False
 
-    # 3. Jika user belum login, tampilkan form
     if not st.session_state.logged_in:
         st.title("Login Dasbor")
         st.sidebar.info("Silakan masukkan username dan password untuk mengakses dasbor.")
@@ -39,24 +36,20 @@ def check_login():
             submitted = st.form_submit_button("Login")
 
             if submitted:
-                # 4. Validasi kredensial
                 if username in users_db and users_db[username] == password:
                     st.session_state.logged_in = True
-                    st.session_state.username = username # Simpan username untuk sapaan
-                    st.rerun()  # <-- DIUBAH: dari st.experimental_rerun()
+                    st.session_state.username = username
+                    st.rerun()
                 else:
                     st.error("Username atau Password salah.")
         
-        return False  # Hentikan eksekusi sisa skrip
+        return False
     
-    # 5. Jika sudah login, izinkan lanjut dan tampilkan tombol logout
-    st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.pop('username', None) # Hapus username dari state
-        st.rerun() # <-- DIUBAH: dari st.experimental_rerun()
+    # --- KODE LOGOUT DIHAPUS DARI SINI ---
+    # Kita pindahkan ke bagian utama aplikasi
+    # agar bisa diletakkan di paling bawah sidebar.
         
-    return True # Izinkan eksekusi sisa skrip
+    return True
 
 # --- FUNGSI MEMUAT DATA ---
 @st.cache_data
@@ -243,7 +236,7 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
                 return str(text).replace('_', '\\_') if isinstance(text, str) else text
             
             definisi = escape_md(deskripsi_row['DEFINISI'].iloc[0])
-            harapan = escape_md(deskripsi_row['NILAI_HARAPAN'].iloc[0])
+            harapan = escape_dim(deskripsi_row['NILAI_HARAPAN'].iloc[0])
             rumus = escape_md(deskripsi_row['RUMUS'].iloc[0])
 
             if pd.notna(definisi) and definisi: st.info(f"**Definisi**: {definisi}")
@@ -254,12 +247,7 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
 
 # --- STRUKTUR UTAMA APLIKASI (DIBUNGKUS OLEH LOGIN) ---
 
-# Panggil fungsi login. 
-# Jika mengembalikan True (login berhasil), jalankan seluruh aplikasi.
 if check_login():
-    
-    # Semua kode aplikasi asli Anda dimulai dari sini,
-    # dan semuanya harus di-indentasi (menjorok ke dalam)
     
     display_main_header()
     display_intro()
@@ -281,13 +269,10 @@ if check_login():
         
         info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
         
-        # KOREKSI: Mengambil daftar klaster dan mengurutkannya secara numerik
         unique_klaster = info_level_df['KLASTER'].dropna().unique()
         try:
-            # Coba urutkan sebagai angka jika memungkinkan
             daftar_klaster = sorted(unique_klaster, key=int)
         except ValueError:
-            # Jika ada klaster non-numerik, urutkan sebagai teks biasa
             daftar_klaster = sorted(unique_klaster)
         
         if not daftar_klaster:
@@ -305,6 +290,15 @@ if check_login():
         st.markdown('<p class="customization-header">Kustomisasi Tampilan</p>', unsafe_allow_html=True)
         chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
         color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
+
+        # --- KODE LOGOUT DIPINDAHKAN KE SINI ---
+        # Ini akan menampilkannya di sidebar, di bawah semua elemen lain.
+        st.sidebar.markdown("---")
+        st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
+        if st.sidebar.button("Logout"):
+            st.session_state.logged_in = False
+            st.session_state.pop('username', None) 
+            st.rerun()
 
     with chart_col:
         if selected_indikator and selected_klaster is not None:
