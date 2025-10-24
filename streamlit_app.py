@@ -6,12 +6,57 @@ from PIL import Image
 import base64
 from pathlib import Path
 
-# --- KONFIGURASI HALAMAN ---
+# --- KONFIGURASI HALAMAN (DI LUAR LOGIN) ---
 st.set_page_config(
     layout="wide",
     page_title="Dashboard Keuangan Pemda",
     page_icon="📊"
 )
+
+# --- BLOK KODE UNTUK AUTENTIKASI ---
+def check_login():
+    """Fungsi untuk menampilkan form login dan validasi."""
+    
+    # 1. Cek apakah 'logged_in' sudah ada di session state
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+    
+    # 2. Ambil daftar user dari st.secrets
+    try:
+        users_db = st.secrets['credentials']['users']
+    except (KeyError, FileNotFoundError):
+        st.error("Error: Konfigurasi 'secrets' untuk kredensial user belum diatur oleh admin.")
+        return False
+
+    # 3. Jika user belum login, tampilkan form
+    if not st.session_state.logged_in:
+        st.title("Login Dasbor")
+        st.sidebar.info("Silakan masukkan username dan password untuk mengakses dasbor.")
+        
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login")
+
+            if submitted:
+                # 4. Validasi kredensial
+                if username in users_db and users_db[username] == password:
+                    st.session_state.logged_in = True
+                    st.session_state.username = username # Simpan username untuk sapaan
+                    st.experimental_rerun()  # Muat ulang aplikasi setelah login berhasil
+                else:
+                    st.error("Username atau Password salah.")
+        
+        return False  # Hentikan eksekusi sisa skrip
+    
+    # 5. Jika sudah login, izinkan lanjut dan tampilkan tombol logout
+    st.sidebar.success(f"Login sebagai: {st.session_state.get('username', 'User')}")
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.session_state.pop('username', None) # Hapus username dari state
+        st.experimental_rerun() # Muat ulang untuk kembali ke form login
+        
+    return True # Izinkan eksekusi sisa skrip
 
 # --- FUNGSI MEMUAT DATA ---
 @st.cache_data
@@ -207,63 +252,70 @@ def display_chart(selected_pemda, selected_indikator, selected_klaster, indikato
         else:
             st.warning("Informasi deskripsi untuk indikator ini tidak tersedia.")
 
-# --- STRUKTUR UTAMA APLIKASI ---
+# --- STRUKTUR UTAMA APLIKASI (DIBUNGKUS OLEH LOGIN) ---
 
-display_main_header()
-display_intro()
+# Panggil fungsi login. 
+# Jika mengembalikan True (login berhasil), jalankan seluruh aplikasi.
+if check_login():
+    
+    # Semua kode aplikasi asli Anda dimulai dari sini,
+    # dan semuanya harus di-indentasi (menjorok ke dalam)
+    
+    display_main_header()
+    display_intro()
 
-data_tuple = load_data_from_excel()
-if data_tuple[0] is None:
-    st.stop()
-info_df, parameter_df, indikator_df, median_df, tren_df = data_tuple
+    data_tuple = load_data_from_excel()
+    if data_tuple[0] is None:
+        st.stop()
+    info_df, parameter_df, indikator_df, median_df, tren_df = data_tuple
 
-filter_col, chart_col = st.columns([2, 5])
+    filter_col, chart_col = st.columns([2, 5])
 
-with filter_col:
-    pilihan_tingkat = st.radio("Pilih Tingkat Pemerintah Daerah", ('Provinsi', 'Kabupaten', 'Kota'), horizontal=True)
-    
-    pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), horizontal=True)
-    
-    daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
-    selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator)
-    
-    info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
-    
-    # KOREKSI: Mengambil daftar klaster dan mengurutkannya secara numerik
-    unique_klaster = info_level_df['KLASTER'].dropna().unique()
-    try:
-        # Coba urutkan sebagai angka jika memungkinkan
-        daftar_klaster = sorted(unique_klaster, key=int)
-    except ValueError:
-        # Jika ada klaster non-numerik, urutkan sebagai teks biasa
-        daftar_klaster = sorted(unique_klaster)
-    
-    if not daftar_klaster:
-        st.warning(f"Tidak ada data klaster untuk tingkat {pilihan_tingkat}.")
-        selected_klaster = None
-        selected_pemda = []
-    else:
-        selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster)
+    with filter_col:
+        pilihan_tingkat = st.radio("Pilih Tingkat Pemerintah Daerah", ('Provinsi', 'Kabupaten', 'Kota'), horizontal=True)
         
-        pemda_in_klaster = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
-        selected_pemda = st.multiselect(f"Pilih {pilihan_tingkat}", pemda_in_klaster, placeholder="Pilih satu atau lebih")
+        pilihan_data = st.radio("Pilih Tema Analisis", ('Kinerja Keuangan', 'Kondisi Keuangan'), horizontal=True)
+        
+        daftar_indikator = parameter_df[parameter_df['JENIS'] == pilihan_data]['INDIKATOR'].unique()
+        selected_indikator = st.selectbox("Pilih Indikator", daftar_indikator)
+        
+        info_level_df = info_df[info_df['TINGKAT'] == pilihan_tingkat]
+        
+        # KOREKSI: Mengambil daftar klaster dan mengurutkannya secara numerik
+        unique_klaster = info_level_df['KLASTER'].dropna().unique()
+        try:
+            # Coba urutkan sebagai angka jika memungkinkan
+            daftar_klaster = sorted(unique_klaster, key=int)
+        except ValueError:
+            # Jika ada klaster non-numerik, urutkan sebagai teks biasa
+            daftar_klaster = sorted(unique_klaster)
+        
+        if not daftar_klaster:
+            st.warning(f"Tidak ada data klaster untuk tingkat {pilihan_tingkat}.")
+            selected_klaster = None
+            selected_pemda = []
+        else:
+            selected_klaster = st.selectbox("Pilih Klaster", daftar_klaster)
+            
+            pemda_in_klaster = sorted(info_level_df[info_level_df['KLASTER'] == selected_klaster]['PEMDA'].dropna().unique())
+            selected_pemda = st.multiselect(f"Pilih {pilihan_tingkat}", pemda_in_klaster, placeholder="Pilih satu atau lebih")
 
-    display_cluster_info_in_sidebar(info_df, pilihan_tingkat)
-    
-    st.markdown('<p class="customization-header">Kustomisasi Tampilan</p>', unsafe_allow_html=True)
-    chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
-    color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
+        display_cluster_info_in_sidebar(info_df, pilihan_tingkat)
+        
+        st.markdown('<p class="customization-header">Kustomisasi Tampilan</p>', unsafe_allow_html=True)
+        chart_type = st.radio("Pilih Tipe Grafik", ('Garis', 'Batang', 'Area'), horizontal=True)
+        color_palette = st.selectbox("Pilih Palet Warna", ['Default', 'G10', 'T10', 'Pastel', 'Dark2'])
 
-with chart_col:
-    if selected_indikator and selected_klaster is not None:
-        display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
-    else:
-        st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
+    with chart_col:
+        if selected_indikator and selected_klaster is not None:
+            display_chart(selected_pemda, selected_indikator, selected_klaster, indikator_df, median_df, chart_type, color_palette, pilihan_tingkat, tren_df)
+        else:
+            st.info("ℹ️ Silakan lengkapi semua filter di kolom kiri untuk menampilkan data analisis.")
 
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; padding: 1rem 0;">
-    Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
-    <a href="https://hakcipta.dgip.go.id/legal/c/Zjg5NzI5NDkyYTQxZDk1OGNlNjY0MWVjMDNjZGFmNzE=" target="_blank">Lihat Sertifikat HKI</a>
-</div>
-""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; padding: 1rem 0;">
+        Hak Cipta © 2025 Tim Pengembang MAKSI FEB UGM. Dilindungi Undang-Undang.<br>
+        <a href="https://hakcipta.dgip.go.id/legal/c/Zjg5NzI5NDkyYTQxZDk1OGNlNjY0MWVjMDNjZGFmNzE=" target="_blank">Lihat Sertifikat HKI</a>
+    </div>
+    """, unsafe_allow_html=True)
