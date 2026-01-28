@@ -4,34 +4,43 @@ from github import Github
 import io
 import requests
 
-# --- 1. KONFIGURASI HALAMAN & CSS ---
+# --- 1. KONFIGURASI HALAMAN ---
 st.set_page_config(page_title="Admin Database", layout="wide")
 
-# CSS Kustom untuk memaksa Scrollbar lebih besar dan terlihat
+# CSS AGRESIF: Memaksa scrollbar muncul dan besar
 st.markdown("""
     <style>
-    /* Mempertebal Scrollbar Global */
-    ::-webkit-scrollbar {
-        width: 15px;
-        height: 15px;
+    /* 1. Paksa Scrollbar Tabel agar Selalu Terlihat & Tebal */
+    [data-testid="stDataFrame"] > div {
+        overflow: auto !important;
     }
-    ::-webkit-scrollbar-thumb {
-        background: #888; 
+    
+    /* Chrome, Edge, Safari */
+    [data-testid="stDataFrame"] ::-webkit-scrollbar {
+        width: 20px !important;    /* Lebar scrollbar vertikal */
+        height: 20px !important;   /* Tinggi scrollbar horizontal */
+        display: block !important;
+    }
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
         border-radius: 10px;
-        border: 3px solid #f1f1f1;
     }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb {
+        background: #c1c1c1 !important; /* Warna abu-abu yang jelas */
+        border: 4px solid #f1f1f1 !important; /* Memberi jarak agar mudah dilihat */
+        border-radius: 10px !important;
     }
-    
-    /* Memaksa area data editor agar lebih luas */
-    .stDataEditor div {
-        overflow: visible !important;
+
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8 !important; /* Lebih gelap saat disentuh */
     }
-    
-    /* Tombol Logout di pojok kanan atas */
-    .logout-btn {
-        float: right;
+
+    /* 2. Style untuk Radio Button (Sheet Selector) agar lebih lega */
+    div[data-testid="stWidgetLabel"] {
+        font-weight: bold;
+        font-size: 18px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -53,15 +62,11 @@ def check_password():
     return True
 
 if check_password():
-    # Header & Tombol Logout
-    col_head, col_logout = st.columns([0.9, 0.1])
-    with col_head:
-        st.title("📊 Database Editor")
-    with col_logout:
-        if st.button("Logout"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+    # Tombol Logout di paling atas
+    if st.button("🚪 Logout", use_container_width=False):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
     GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
     REPO_NAME = st.secrets["REPO_NAME"]
@@ -74,50 +79,37 @@ if check_password():
         g = Github(GITHUB_TOKEN)
         repo = g.get_repo(REPO_NAME)
         
-        # Load data awal
         if st.session_state.all_sheets is None:
             contents = repo.get_contents(FILE_PATH)
             headers = {"Authorization": f"token {GITHUB_TOKEN}"}
             response = requests.get(contents.download_url, headers=headers)
             st.session_state.all_sheets = pd.read_excel(io.BytesIO(response.content), sheet_name=None, engine='openpyxl')
 
-        # --- NAVIGASI SHEET (PINDAH KE TENGAH) ---
+        # Navigasi Sheet
         sheet_list = list(st.session_state.all_sheets.keys())
-        st.write("### Pilih Tab Database:")
-        selected_sheet = st.radio("Daftar Sheet:", sheet_list, horizontal=True)
+        selected_sheet = st.radio("📑 Pilih Sheet / Tabel:", sheet_list, horizontal=True)
         
-        st.divider()
+        st.write("---")
 
-        # --- PENGATURAN KOLOM & DESIMAL ---
-        current_df = st.session_state.all_sheets[selected_sheet]
-        
-        # Deteksi kolom angka
-        num_cols = current_df.select_dtypes(include=['number']).columns
-        
-        # Konfigurasi: Kita gunakan format Indonesia (Koma)
-        # Catatan: Tampilan di layar akan menyesuaikan Locale Browser Anda.
-        # Jika browser Anda bahasa Indonesia, titik akan otomatis jadi koma.
-        config = {col: st.column_config.NumberColumn(format="%.2f") for col in num_cols}
-
-        # --- DATA EDITOR (SCROLLBAR BESAR) ---
+        # --- DATA EDITOR ---
+        # Kami hapus column_config agar format angka kembali ke default (plain)
+        # Kami kunci height di 600px agar scrollbar HARUS muncul
         edited_df = st.data_editor(
-            current_df,
+            st.session_state.all_sheets[selected_sheet],
             num_rows="dynamic",
             use_container_width=True,
-            height=650, 
-            key=f"editor_{selected_sheet}",
-            column_config=config
+            height=600, 
+            key=f"editor_{selected_sheet}"
         )
 
-        # Simpan perubahan sementara ke session state
         st.session_state.all_sheets[selected_sheet] = edited_df
 
         # --- TOMBOL AKSI ---
-        st.divider()
+        st.write("")
         c1, c2 = st.columns([1, 4])
         
         with c1:
-            # Backup
+            # Backup All Sheets
             output_backup = io.BytesIO()
             with pd.ExcelWriter(output_backup, engine='openpyxl') as writer:
                 for s_name, df in st.session_state.all_sheets.items():
@@ -126,16 +118,14 @@ if check_password():
             st.download_button(
                 label="📥 Download Backup",
                 data=output_backup.getvalue(),
-                file_name=f"backup_{FILE_PATH}",
+                file_name=f"backup_full.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
         with c2:
-            if st.button("🚀 Simpan Perubahan ke GitHub"):
-                with st.status("Proses Sinkronisasi...", expanded=False) as status:
-                    # AMBIL SHA TERBARU (Penting agar update kedua tidak error)
+            if st.button("🚀 SIMPAN PERUBAHAN KE CLOUD", use_container_width=True):
+                with st.status("Menghubungkan ke GitHub...") as status:
                     latest_contents = repo.get_contents(FILE_PATH)
-                    
                     output_save = io.BytesIO()
                     with pd.ExcelWriter(output_save, engine='openpyxl') as writer:
                         for s_name, df in st.session_state.all_sheets.items():
@@ -143,12 +133,12 @@ if check_password():
                     
                     repo.update_file(
                         path=latest_contents.path,
-                        message="Admin Manual Update via Web Editor",
+                        message="Admin Update via Web Editor",
                         content=output_save.getvalue(),
                         sha=latest_contents.sha
                     )
                     status.update(label="✅ Berhasil Disimpan!", state="complete")
-                    st.toast("Database Cloud diperbarui!", icon="✅")
+                    st.toast("Data sudah sinkron!")
 
     except Exception as e:
         st.error(f"Error: {e}")
