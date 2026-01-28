@@ -36,7 +36,7 @@ def check_password():
 if check_password():
     # --- HEADER ---
     c_t, c_l = st.columns([0.88, 0.12])
-    with c_t: st.write("### 📊 Admin Panel")
+    with c_t: st.write("### 📊 Maksikeuda Editor")
     with c_l:
         if st.button("🚪 Logout", use_container_width=True):
             for k in list(st.session_state.keys()): del st.session_state[k]
