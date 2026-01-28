@@ -3,6 +3,7 @@ import pandas as pd
 from github import Github
 import io
 import base64
+import requests
 
 # --- 1. FUNGSI LOGIN ---
 def check_password():
@@ -34,38 +35,26 @@ if check_password():
     FILE_PATH = "data.xlsx"
 
     try:
-        # Koneksi ke GitHub
+        # 1. Inisialisasi GitHub
         g = Github(GITHUB_TOKEN)
         repo = g.get_repo(REPO_NAME)
         contents = repo.get_contents(FILE_PATH)
         
-        # PERBAIKAN: Manual decoding base64 untuk menghindari error 'unsupported encoding'
-        file_data = base64.b64decode(contents.content)
-        df = pd.read_excel(io.BytesIO(file_data), engine='openpyxl')
+        # 2. Ambil data mentah menggunakan URL download resmi dari GitHub
+        # Cara ini lebih stabil untuk file biner (Excel)
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+        response = requests.get(contents.download_url, headers=headers)
+        
+        if response.status_code == 200:
+            file_data = response.content
+            # 3. Baca ke Pandas
+            df = pd.read_excel(io.BytesIO(file_data), engine='openpyxl')
+        else:
+            st.error(f"Gagal mendownload file. Status code: {response.status_code}")
+            st.stop()
 
-        # Google Sheets Style Editor
-        # Kita beri key agar state editor terjaga
-        edited_df = st.data_editor(
-            df, 
-            num_rows="dynamic", 
-            use_container_width=True,
-            key="editor_utama"
-        )
-
-        st.divider()
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Fitur Backup Lokal
-            towrite = io.BytesIO()
-            edited_df.to_excel(towrite, index=False, engine='openpyxl')
-            st.download_button(
-                label="📥 Download Backup (Excel)",
-                data=towrite.getvalue(),
-                file_name=f"backup_{FILE_PATH}",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
+        # --- Editor Data ---
+        edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True, key="editor_v2")
         with col2:
             # Fitur Update ke GitHub
             if st.button("🚀 Update & Restore Database"):
